@@ -113,6 +113,7 @@ def histogram(args, events, call_targets):
             "{deopts:>10} | "
             "{evictions:>10} | "
             "{failures:>10} | "
+            "{ttis:>10} | "
             "{second:>10} | "
             "{third:>50} | "
             "{fourth:>50}"
@@ -123,6 +124,7 @@ def histogram(args, events, call_targets):
                 deopts = "Deopts", 
                 evictions = "evictions", 
                 failures = "failures", 
+                ttis = "TransToInt", 
                 second = "ID", 
                 third = "Method", 
                 fourth = "Source"))
@@ -138,6 +140,7 @@ def histogram(args, events, call_targets):
               f"{len(target._deopts):>10} | "
               f"{len(target._evictions):>10} | "
               f"{len(target._failures):>10} | "
+              f"{len(target._ttis):>10} | "
               f"{target._id:>10} | "
               f"{target._name:>50} | "
               f"{target._source:>50}")
@@ -167,10 +170,9 @@ def parseLogFile(args):
         elif line.find("[engine] transferToInterpreter at") >= 0:
             i += 1
             line = lines[i]
-            #print(line)
-            #entry = ParseTruffleEngineLogEntry(line).entry()
-            #if entry != None :
-            #    truffleEvents.append(entry)
+            entry = ParseTruffleEngineLogEntry(line).entry()
+            if entry != None :
+                truffleEvents.append(entry)
 
     return hotspotEvents, truffleEvents
 
@@ -186,6 +188,10 @@ def collectCallTargets(events):
 
 
 def populateEventsToCallTargets(call_targets, hotspotEvents, truffleEvents):
+    speedup = {}
+    for ct in call_targets.values():
+        speedup[ct._name] = ct
+
     for truffleEvent in truffleEvents:
         if truffleEvent._eventType == LogEventType.Start :
             call_targets[truffleEvent._id]._starts.append(truffleEvent)
@@ -197,6 +203,12 @@ def populateEventsToCallTargets(call_targets, hotspotEvents, truffleEvents):
             call_targets[truffleEvent._id]._invals.append(truffleEvent)
         elif truffleEvent._eventType == LogEventType.Failed:
             call_targets[truffleEvent._id]._failures.append(truffleEvent)
+        elif truffleEvent._eventType == LogEventType.TransferToInterpreter:
+            if truffleEvent._name in speedup:
+                target = speedup[truffleEvent._name]
+                call_targets[target._id]._ttis.append(truffleEvent)
+            #else:
+            #    print(f"Not found {truffleEvent._name}")
 
     speedup = {}
     for ct in call_targets.values():

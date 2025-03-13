@@ -19,12 +19,19 @@ class ParseTruffleEngineLogEntry:
         elif logLine.startswith("[engine] opt start"):
             logLine = logLine.replace("[engine] opt start", "").strip()
             self._entry = self.parseStartEntry(logLine);
+        elif logLine.startswith("[engine] opt queued"):
+            logLine = logLine.replace("[engine] opt queued", "").strip()
+            #self._entry = self.parseQueuedEntry(logLine);
         elif logLine.startswith("[engine] opt unque"):
             logLine = logLine.replace("[engine] opt unque", "").strip()
             self._entry = self.parseUnqueueEntry(logLine);
         elif logLine.startswith("[engine] opt failed"):
             logLine = logLine.replace("[engine] opt failed", "").strip()
             self._entry = self.parseFailedEntry(logLine);
+        else:
+            logLine = logLine.strip()
+            self._entry = self.parseTransferToInterpreterEntry(logLine);
+
 
     def entry(self):
         return self._entry
@@ -190,6 +197,32 @@ class ParseTruffleEngineLogEntry:
                                         self.parseLabelAndValue(parts[4]),  # timestamp
                                         parts[5],                           # source
                                         parts[3])                           # reason
+
+    def parseTransferToInterpreterEntry(self, logLine):
+        parts = logLine.split('(')
+        name = parts[0]
+        source = parts[1].split(')')[0]
+        trailing = '-'.join(parts[1].split(')')[1:]).strip()
+
+        # These entries don't have many of the usual fields
+        return TruffleEngineOptLogEntry(logLine,
+                                        LogEventType.TransferToInterpreter,
+                                        -1,
+                                        -1,
+                                        f"{name} {trailing}".strip(),
+                                        None,     # tier
+                                        0,        # compilation_time
+                                        None,     # ast_size
+                                        None,     # inlining info
+                                        None,     # ir info
+                                           0,     # code size info
+                                        None,     # code addr info
+                                        None,     # compilation id
+                                        "2050-01-01T23:59:59.123",     # timestamp
+                                        source,                        # source
+                                        None)                          # reason
+
+        print(f"Name: {name} Source: {source} Trailing: {trailing}  -> {logLine}")
 
 
     def parseLabelAndValue(self, component):
