@@ -6,7 +6,8 @@ class LogEventType(Enum):
     Done                  = 2
     Deoptization          = 3
     Invalidation          = 4
-    Unqueue               = 5
-    Failed                = 6
-    TransferToInterpreter = 7
-    CacheFlushing         = 8
+    Enqueued              = 5
+    Dequeued              = 6
+    Failed                = 7
+    TransferToInterpreter = 8
+    CacheFlushing         = 9

@@ -21,10 +21,10 @@ class ParseTruffleEngineLogEntry:
             self._entry = self.parseStartEntry(logLine);
         elif logLine.startswith("[engine] opt queued"):
             logLine = logLine.replace("[engine] opt queued", "").strip()
-            #self._entry = self.parseQueuedEntry(logLine);
+            self._entry = self.parseEnqueueEntry(logLine);
         elif logLine.startswith("[engine] opt unque"):
             logLine = logLine.replace("[engine] opt unque", "").strip()
-            self._entry = self.parseUnqueueEntry(logLine);
+            self._entry = self.parseDequeueEntry(logLine);
         elif logLine.startswith("[engine] opt failed"):
             logLine = logLine.replace("[engine] opt failed", "").strip()
             self._entry = self.parseFailedEntry(logLine);
@@ -117,7 +117,7 @@ class ParseTruffleEngineLogEntry:
                                         parts[3],                          # source
                                         None) #reason
 
-    def parseUnqueueEntry(self, logLine):
+    def parseDequeueEntry(self, logLine):
         parts = logLine.split('|')
 
         if len(parts) != 7 :
@@ -128,7 +128,7 @@ class ParseTruffleEngineLogEntry:
         targetId, engineId, callTargetName = self.parseIdComponent(parts[0])
 
         return TruffleEngineOptLogEntry(logLine,
-                                        LogEventType.Start,
+                                        LogEventType.Dequeued,
                                         engineId,
                                         targetId,
                                         callTargetName,
@@ -143,6 +143,33 @@ class ParseTruffleEngineLogEntry:
                                         self.parseLabelAndValue(parts[4]),  # timestamp
                                         parts[5],                           # source
                                         parts[6])                           # reason
+
+    def parseEnqueueEntry(self, logLine):
+        parts = logLine.split('|')
+
+        if len(parts) != 6 :
+            if False:
+                print(f"Can't parse this line that has {len(parts)} parts: {logLine}")
+            return None
+
+        targetId, engineId, callTargetName = self.parseIdComponent(parts[0])
+
+        return TruffleEngineOptLogEntry(logLine,
+                                        LogEventType.Enqueued,
+                                        engineId,
+                                        targetId,
+                                        callTargetName,
+                                        parts[1], # tier
+                                           0,     # compilation_time
+                                        None,     # ast_size
+                                        None,     # inlining info
+                                        None,     # ir info
+                                           0,     # code size info
+                                        None,     # code addr info
+                                        None,     # compilation id
+                                        self.parseLabelAndValue(parts[4]),  # timestamp
+                                        parts[5],                           # source
+                                        None)                               # reason
 
     def parseDoneEntry(self, logLine):
         parts = logLine.split('|')
@@ -223,7 +250,6 @@ class ParseTruffleEngineLogEntry:
                                         None)                          # reason
 
         print(f"Name: {name} Source: {source} Trailing: {trailing}  -> {logLine}")
-
 
     def parseLabelAndValue(self, component):
         parts = " ".join(component.split()).split(' ')
