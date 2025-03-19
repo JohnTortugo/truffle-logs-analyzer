@@ -10,24 +10,31 @@ class ParseTruffleEngineLogEntry:
         if logLine.startswith("[engine] opt done"):
             logLine = logLine.replace("[engine] opt done", "").strip()
             self._entry = self.parseDoneEntry(logLine);
+
         elif logLine.startswith("[engine] opt inval"):
             logLine = logLine.replace("[engine] opt inval.", "").strip()
             self._entry = self.parseInvalEntry(logLine);
+
         elif logLine.startswith("[engine] opt deopt"):
             logLine = logLine.replace("[engine] opt deopt", "").strip()
             self._entry = self.parseDeoptEntry(logLine);
+
         elif logLine.startswith("[engine] opt start"):
             logLine = logLine.replace("[engine] opt start", "").strip()
             self._entry = self.parseStartEntry(logLine);
+
         elif logLine.startswith("[engine] opt queued"):
             logLine = logLine.replace("[engine] opt queued", "").strip()
             self._entry = self.parseEnqueueEntry(logLine);
+
         elif logLine.startswith("[engine] opt unque"):
             logLine = logLine.replace("[engine] opt unque", "").strip()
             self._entry = self.parseDequeueEntry(logLine);
+
         elif logLine.startswith("[engine] opt failed"):
             logLine = logLine.replace("[engine] opt failed", "").strip()
             self._entry = self.parseFailedEntry(logLine);
+
         else:
             logLine = logLine.strip()
             self._entry = self.parseTransferToInterpreterEntry(logLine);
@@ -52,6 +59,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                         parts[1], # tier
+                                        None,     # execution_count
                                            0,     # compilation_time
                                         None,     # ast_size
                                         None,     # inlining info
@@ -79,6 +87,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                           "", # tier
+                                        None, # execution_count
                                            0, # compilation_time
                                         None, # ast_size
                                         None, # inlining info
@@ -106,6 +115,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                           "", # tier
+                                        None, # execution_count
                                            0, # compilation_time
                                         None, # ast_size
                                         None, # inlining info
@@ -133,6 +143,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                         parts[1], # tier
+                                        None,     # execution_count
                                            0,     # compilation_time
                                         None,     # ast_size
                                         None,     # inlining info
@@ -160,6 +171,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                         parts[1], # tier
+                                        self.parseCountAndThreshold(parts[2]),   # execution_count
                                            0,     # compilation_time
                                         None,     # ast_size
                                         None,     # inlining info
@@ -187,6 +199,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                         parts[1], # tier
+                                        None,     # execution_count
                                         self.parseTimeComponent(parts[2]), # compilation_time
                                         parts[3], # ast_size
                                         parts[4], # inlining info
@@ -214,6 +227,7 @@ class ParseTruffleEngineLogEntry:
                                         targetId,
                                         callTargetName,
                                         parts[1], # tier
+                                        None,     # execution_count
                                         self.parseTimeComponent(parts[2]),     # compilation_time
                                         None,     # ast_size
                                         None,     # inlining info
@@ -238,6 +252,7 @@ class ParseTruffleEngineLogEntry:
                                         -1,
                                         f"{name} {trailing}".strip(),
                                         None,     # tier
+                                        None,     # execution_count
                                         0,        # compilation_time
                                         None,     # ast_size
                                         None,     # inlining info
@@ -250,6 +265,10 @@ class ParseTruffleEngineLogEntry:
                                         None)                          # reason
 
         print(f"Name: {name} Source: {source} Trailing: {trailing}  -> {logLine}")
+
+    def parseCountAndThreshold(self, component):
+        parts = " ".join(component.split()).split(' ')
+        return parts[1].split('/')[0]
 
     def parseLabelAndValue(self, component):
         parts = " ".join(component.split()).split(' ')

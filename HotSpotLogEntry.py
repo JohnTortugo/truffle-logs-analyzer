@@ -5,7 +5,7 @@ class HotSpotLogEntry:
         self._raw       = raw
         self._tier      = ""
         self._eventType = logEventType
-        self._hotspotCompId  = hotspotCompId
+        self._comp_id  = hotspotCompId
         self._timestamp = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%f%z")
 
     def __str__(self):

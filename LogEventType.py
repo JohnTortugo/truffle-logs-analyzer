@@ -1,6 +1,5 @@
 from enum import Enum
 
-
 class LogEventType(Enum):
     Start                 = 1
     Done                  = 2

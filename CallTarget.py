@@ -16,6 +16,13 @@ class CallTarget:
         self._enqueues = []
         self._dequeues = []
 
+    def exec_count(self):
+        if len(self._enqueues) > 0:
+            evts = sorted(self._enqueues, key=lambda e: e._timestamp, reverse=True)
+            return evts[0]._exec_count
+        else:
+            return 0
+
     def all_events_sorted(self):
         all_events = self._deopts
         all_events.extend(self._dones)
