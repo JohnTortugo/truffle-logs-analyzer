@@ -197,7 +197,7 @@ def histogram(hsize, call_targets):
               f"{target._source:>50}")
 
 
-def comp_rate(call_targets):
+def comp_rate(granularity, call_targets):
     compilations = defaultdict(int)
     produced_code = defaultdict(int)
     time_spent = defaultdict(int)
@@ -208,6 +208,18 @@ def comp_rate(call_targets):
     min_time = datetime.datetime.now(datetime.timezone.utc) + timedelta(days=3650)
     max_time = datetime.datetime.now(datetime.timezone.utc) - timedelta(days=3650)
 
+    minutes_increment = 0
+    time_key_pattern = ""
+    if granularity == "hour":
+        time_key_pattern = "%Y-%m-%d %H"
+        minutes_increment = 60
+    elif granularity == "minute":
+        time_key_pattern = "%Y-%m-%d %H:%M"
+        minutes_increment = 1
+    else:
+        print(f"Unknown comp_rate granularity '{granularity}'.")
+        return
+
     for ct in call_targets.values():
         for dn in ct._dones:
             if dn._timestamp < min_time:
@@ -215,48 +227,48 @@ def comp_rate(call_targets):
             if dn._timestamp > max_time:
                 max_time = dn._timestamp
 
-            hour_key = dn._timestamp.strftime("%Y-%m-%d %H")
-            compilations[hour_key] += 1
-            produced_code[hour_key] += dn._code_size_in_bytes
-            time_spent[hour_key] += dn._comp_time
-            sources[hour_key].add(ct._source)
-            targets[hour_key].add(ct._id)
+            time_key = dn._timestamp.strftime(time_key_pattern)
+            compilations[time_key] += 1
+            produced_code[time_key] += dn._code_size_in_bytes
+            time_spent[time_key] += dn._comp_time
+            sources[time_key].add(ct._source)
+            targets[time_key].add(ct._id)
 
         for eviction in ct._evictions:
-            hour_key = eviction._timestamp.strftime("%Y-%m-%d %H")
-            evictions[hour_key] += 1
+            time_key = eviction._timestamp.strftime(time_key_pattern)
+            evictions[time_key] += 1
 
-    print("{hour:>20} | {compilations:>15} | {code:>15} | {time:>15} | {targets:>15} | {sources:>15} | {cumul_tgts:>15} | {sum_uniq_comps:>15} | {evictions:>15} |"
-            .format(hour = "Datetime", compilations = "Compilations", code = "CodeGen (MB)", time = "CmplTime (s)", targets = "CallTargets", sources = "Sources", cumul_tgts = "CumTargets", sum_uniq_comps = "SumUniqComps (MB)", evictions = "Evictions"))
+    print("{time_key:>20} | {compilations:>15} | {code:>15} | {time:>15} | {targets:>15} | {sources:>15} | {cumul_tgts:>15} | {sum_uniq_comps:>15} | {evictions:>15} |"
+            .format(time_key = "Datetime", compilations = "Compilations", code = "CodeGen (MB)", time = "CmplTime (s)", targets = "CallTargets", sources = "Sources", cumul_tgts = "CumTargets", sum_uniq_comps = "SumUniqComps (MB)", evictions = "Evictions"))
 
     curr_time = min_time
     while curr_time <= max_time:
-        hour = curr_time.strftime("%Y-%m-%d %H")
+        time_key = curr_time.strftime(time_key_pattern)
 
-        # Find which is the largest compilation done within the given "hour"
+        # Find which is the largest compilation done within the given "time_key"
         sum_largest_compilations = 0
-        for ct_id in targets[hour]:
+        for ct_id in targets[time_key]:
             cumulative_targets.add(ct_id)
             ct = call_targets[ct_id]
             mx = 0
             for dn in ct._dones:
-                dn_time = dn._timestamp.strftime("%Y-%m-%d %H")
-                if dn_time == hour:
+                dn_time = dn._timestamp.strftime(time_key_pattern)
+                if dn_time == time_key:
                     if mx < dn._code_size_in_bytes:
                         mx = dn._code_size_in_bytes
             sum_largest_compilations += mx
 
-        print(f"{hour:>20} | "
-              f"{compilations[hour]:>15} | "
-              f"{produced_code[hour]/1024/1024:>15.0f} | "
-              f"{time_spent[hour]/1000:>15.3f} | "
-              f"{len(targets[hour]):>15} | "
-              f"{len(sources[hour]):>15} | " 
+        print(f"{time_key:>20} | "
+              f"{compilations[time_key]:>15} | "
+              f"{produced_code[time_key]/1024/1024:>15.0f} | "
+              f"{time_spent[time_key]/1000:>15.3f} | "
+              f"{len(targets[time_key]):>15} | "
+              f"{len(sources[time_key]):>15} | " 
               f"{len(cumulative_targets):>15} | " 
               f"{sum_largest_compilations/1024/1024:>15.0f} | " 
-              f"{evictions[hour]:>15} | ")
+              f"{evictions[time_key]:>15} | ")
 
-        curr_time = curr_time + timedelta(hours=1)
+        curr_time = curr_time + timedelta(minutes=minutes_increment)
 
 
 
@@ -272,6 +284,61 @@ def comp_paretto(call_targets):
         curr_perc = float(counts[freq])/len(call_targets)
         acc_perc += curr_perc
         print("{freq:>5} | {count:>5} | {curr_perc:>7.2f}% | {acc_perc:>7.2f}%".format(freq = freq, count = counts[freq], curr_perc = curr_perc*100, acc_perc = acc_perc*100))
+
+
+def hotspots(hsize, call_targets):
+    def compare(entry1, entry2):
+        if entry2.exec_count() != entry1.exec_count():
+            return entry2.exec_count() - entry1.exec_count()
+        else:
+            return len(entry1._dones) - len(entry2._dones)
+
+    values = list(call_targets.values())
+    targets = sorted(values, key=cmp_to_key(compare))
+
+    print("{first:>10} | "
+            "{comp_time:>15} | "
+            "{total_code_size:>16} | "
+            "{invals:>10} | "
+            "{deopts:>10} | "
+            "{evictions:>10} | "
+            "{failures:>10} | "
+            "{ttis:>10} | "
+            "{exec_count:>10} | "
+            "{second:>10} | "
+            "{third:>50} | "
+            "{fourth:>50}"
+            .format(first = "Comps", 
+                comp_time = "TotCompTime(ms)", 
+                total_code_size = "TotCodeSize (KB)", 
+                invals = "Invals", 
+                deopts = "Deopts", 
+                evictions = "evictions", 
+                failures = "failures", 
+                ttis = "TransToInt", 
+                exec_count = "ExecCount", 
+                second = "ID", 
+                third = "Method", 
+                fourth = "Source"))
+    print("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
+
+    for i in range(0, hsize):
+        target = targets[i]
+        amount_of_produced_code = sum(dn._code_size_in_bytes for dn in target._dones) / 1024
+        amount_of_time_compiling = sum(dn._comp_time for dn in target._dones)
+
+        print(f"{len(target._dones):>10} | "
+              f"{amount_of_time_compiling:>15} | "
+              f"{amount_of_produced_code:>16.0f} | "
+              f"{len(target._invals):>10} | "
+              f"{len(target._deopts):>10} | "
+              f"{len(target._evictions):>10} | "
+              f"{len(target._failures):>10} | "
+              f"{len(target._ttis):>10} | "
+              f"{target.exec_count():>10} | "
+              f"{target._id:>10} | "
+              f"{target._name:>50} | "
+              f"{target._source:>50}")
 
 
 def parseLogFile(args):
@@ -386,8 +453,16 @@ def repl_prompt():
                 return ReplCommand.CallId, [int(parts[1])]
             else:
                 print("Missing call target id argument.")
+        elif cmd == "hotspots":
+            if len(parts) > 1:
+                return ReplCommand.Hotspots, [int(parts[1])]
+            else:
+                print("Missing number of methods to list.")
         elif cmd == "comp_rate":
-            return ReplCommand.CompRate, None
+            if len(parts) > 1:
+                return ReplCommand.CompRate, [parts[1]]
+            else:
+                print("Missing granularity to list comp_rate.")
         elif cmd == "comp_paretto":
             return ReplCommand.CompParetto, None
         elif cmd == "filename":
@@ -408,8 +483,10 @@ def repl(args, call_targets, hotspotEvents, truffleEvents):
             histogram(info[0], call_targets)
         elif cmd == ReplCommand.CallId:
             details_for_call_id(info[0], call_targets)
+        elif cmd == ReplCommand.Hotspots:
+            hotspots(info[0], call_targets)
         elif cmd == ReplCommand.CompRate:
-            comp_rate(call_targets)
+            comp_rate(info[0], call_targets)
         elif cmd == ReplCommand.FileName:
             print(args.logfile)
         elif cmd == ReplCommand.CompParetto:
@@ -425,8 +502,9 @@ if __name__=="__main__":
     parser.add_argument('--histogram', type=int, help='Print histogram with top N compilation targets with most compilations.')
     parser.add_argument('--stats', action='store_true', help='Print general information about compilations.')
     parser.add_argument('--call_id', type=int, help='Print all events related to the call target with the ID specified.')
-    parser.add_argument('--comp_rate', action='store_true', help='Print rate per hour of CPU time, compiled code and number of compilations.')
+    parser.add_argument('--comp_rate', type=str, help='Print several statistics on a <hour/minute> granularity.')
     parser.add_argument('--comp_paretto', action='store_true', help='Print paretto chart of number of call targets by number of compilations.')
+    parser.add_argument('--hotspots', type=int, help='Print top N methods most executed.')
     parser.add_argument('--verbose', action='store_true', help='Print tracing messages.')
     parser.add_argument('--trace', action='store_true', help='Print detailed tracing messages.')
 
@@ -450,11 +528,14 @@ if __name__=="__main__":
         if args.call_id != None and args.call_id > 0 :
             details_for_call_id(args.call_id, call_targets)
 
-        if args.comp_rate :
-            comp_rate(call_targets)
+        if args.comp_rate != None and args.comp_rate != "" :
+            comp_rate(args.comp_rate, call_targets)
 
         if args.comp_paretto:
             comp_paretto(call_targets)
+
+        if args.hotspots != None and args.hotspots > 0:
+            hotspots(args.hotspots, call_targets)
 
         if args.stats :
             stats(call_targets)

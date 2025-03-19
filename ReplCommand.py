@@ -6,5 +6,6 @@ class ReplCommand(Enum):
     CompRate    = 3
     CompParetto = 4
     CallId      = 5
-    FileName    = 6
-    Quit        = 7
+    Hotspots    = 6
+    FileName    = 7
+    Quit        = 8
