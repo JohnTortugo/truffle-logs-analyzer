@@ -1,36 +1,28 @@
+import re
+from typing import Optional
+
 from HotSpotLogEntry import HotSpotLogEntry
 from LogEventType import LogEventType
 
 
 class ParseHotspotLogEntry:
-    def __init__(self, logLine):
-        self._entry = None
-        logLine = logLine.strip()
+    def __init__(self, log_line: str):
+        self._entry = self._parse_code_cache_entry(log_line.strip())
 
-        if logLine.find("*flushing ") >= 0:
-            self._entry = self.parseCodeCacheEntry(logLine);
-
-    def entry(self):
+    def entry(self) -> Optional[HotSpotLogEntry]:
         return self._entry
 
-    def parseCodeCacheEntry(self, logLine):
-        if logLine.find("*flushing ") >= 0 :
-            return self.parseCodeCacheFlushingEntry(logLine)
-        #else:
-        #    print(f"Ignoring this codecache line: {logLine}")
-        return None
+    def _parse_code_cache_entry(self, log_line: str) -> Optional[HotSpotLogEntry]:
+        return self._parse_code_cache_flushing_entry(log_line)
 
-    def parseCodeCacheFlushingEntry(self, logLine):
-        start = logLine.find("[")
-        end = logLine.find("] *flushing", start+1)
-        hotspot_timestamp = logLine[start+1:end]
+    def _parse_code_cache_flushing_entry(self, log_line: str) -> Optional[HotSpotLogEntry]:
+        pattern = r'\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+\d{4})\]\s*\*flushing.*nmethod\s+(\d+)/.*'
 
-        pattern = "nmethod "
-        start = logLine.find(pattern)
-        end = logLine.find("/", start+1)
-        hotspot_comp_id = int(logLine[start+len(pattern):end])
-
-        return HotSpotLogEntry(logLine,
-                                LogEventType.CacheFlushing,
-                                hotspot_comp_id,
-                                hotspot_timestamp)
+        match = re.search(pattern, log_line)
+        if match:
+            return HotSpotLogEntry(log_line,
+                                   LogEventType.CacheFlushing,
+                                   int(match.group(2)),
+                                   match.group(1))
+        else:
+            return None

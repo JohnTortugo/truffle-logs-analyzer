@@ -10,10 +10,12 @@ from functools import cmp_to_key
 from collections import defaultdict
 
 from CallTarget import CallTarget
+from HotSpotLogEntry import HotSpotLogEntry
 from LogEventType import LogEventType
 from ReplCommand import ReplCommand
 from ParseHotspotLogEntry import ParseHotspotLogEntry
 from ParseTruffleEngineLogEntry import ParseTruffleEngineLogEntry
+from TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
 def stats(call_targets):
@@ -341,12 +343,10 @@ def hotspots(hsize, call_targets):
               f"{target._source:>50}")
 
 
-def parseLogFile(args):
-    hotspotEvents = []
-    truffleEvents = []
-    lines = []
-
-    fsize = os.path.getsize(args.logfile)
+def parseLogFile(args) -> tuple[list[HotSpotLogEntry], list[TruffleEngineOptLogEntry]]:
+    hotspot_events: list[HotSpotLogEntry] = []
+    truffle_events: list[TruffleEngineOptLogEntry] = []
+    lines: list[str] = []
 
     with open(args.logfile, 'r') as file:
         for line in file:
@@ -356,22 +356,18 @@ def parseLogFile(args):
         line = lines[i]
         if line.startswith("[engine] opt"): 
             entry = ParseTruffleEngineLogEntry(line).entry()
-            if entry != None :
-                truffleEvents.append(entry)
+            if entry is not None:
+                truffle_events.append(entry)
+            elif args.trace:
+                print(f"Ignoring engine log entry: {line}")
         elif line.find("*flushing ") >= 0:
             entry = ParseHotspotLogEntry(line).entry()
-            if entry != None :
-                hotspotEvents.append(entry)
-            if (args.trace):
+            if entry is not None:
+                hotspot_events.append(entry)
+            elif args.trace:
                 print(f"Ignoring codecache log entry: {line}")
-        #elif line.find("[engine] transferToInterpreter at") >= 0:
-        #    i += 1
-        #    line = lines[i]
-        #    entry = ParseTruffleEngineLogEntry(line).entry()
-        #    if entry != None :
-        #        truffleEvents.append(entry)
 
-    return hotspotEvents, truffleEvents
+    return hotspot_events, truffle_events
 
 
 def collectCallTargets(events):
