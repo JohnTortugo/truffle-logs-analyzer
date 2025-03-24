@@ -20,9 +20,10 @@ class ParseHotspotLogEntry:
 
         match = re.search(pattern, log_line)
         if match:
+            timestamp = match.group(1)
             return HotSpotLogEntry(log_line,
                                    LogEventType.CacheFlushing,
                                    int(match.group(2)),
-                                   match.group(1))
+                                   timestamp[:-2] + ":" + timestamp[-2:]) # timestamp from logs omits colon, this injects it
         else:
             return None

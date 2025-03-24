@@ -15,7 +15,7 @@ from ReplCommand import ReplCommand
 from TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
-def stats(call_targets: dict[int, CallTarget]) -> None:
+def stats(args, call_targets: dict[int, CallTarget]) -> None:
     num_call_targets = len(call_targets)
     num_compilations = sum(len(ct._dones) for ct in call_targets.values())
     num_invalidations = sum(len(ct._invals) for ct in call_targets.values())
@@ -33,20 +33,27 @@ def stats(call_targets: dict[int, CallTarget]) -> None:
                 ct_with_max_compilations.append(ct)
                 num_max_compilation_reached += 1 
 
-    # Count how many call targets reached the maximum compilation threshold 
+    # Count how many flush call targets thrashed
     num_max_cache_trashing_cts = 0
     for ct in ct_with_max_compilations:
-        prev = None
         flushes = 0
+
+        prev = None
         for evt in ct.all_events_sorted():
             if evt._eventType == LogEventType.CacheFlushing:
                 if prev != None and (prev._eventType == LogEventType.Done or prev._eventType == LogEventType.CacheFlushing):
                     flushes += 1
             prev = evt
+
+        # Due to rolling logs, it's possible we've found flushes which have no corresponding dones..avoid divide by
+        # zero in those cases
+        if len(ct._dones) == 0:
+            if args.verbose:
+                print(f"Skipping thrash calculation for target {ct._id} as no 'done' events were encountered")
+            continue
+
         if float(flushes)/len(ct._dones) >= 0.9:
             num_max_cache_trashing_cts += 1
-        else:
-            print(f"{ct._id} -> {float(flushes)/len(ct._dones)}")
 
     print("Number of call targets.....................................: {value}".format(value = num_call_targets))
     print("Number of compilations.....................................: {value}".format(value = num_compilations))
@@ -346,18 +353,19 @@ def parse_log_file(args) -> tuple[list[HotSpotLogEntry], list[TruffleEngineOptLo
 
     with open(args.logfile, 'r') as file:
         for line in file:
-            if line.startswith("[engine] opt"):
-                entry = ParseTruffleEngineOptLogEntry(line).entry()
+            stripped = line.rstrip()
+            if stripped.startswith("[engine] opt"):
+                entry = ParseTruffleEngineOptLogEntry(stripped).entry()
                 if entry is not None:
                     truffle_events.append(entry)
                 elif args.trace:
-                    print(f"Ignoring engine log entry: {line}")
-            elif line.find("*flushing ") >= 0:
-                entry = ParseHotspotLogEntry(line).entry()
+                    print(f"Ignoring engine log entry: {stripped}")
+            elif stripped.find("*flushing ") >= 0:
+                entry = ParseHotspotLogEntry(stripped).entry()
                 if entry is not None:
                     hotspot_events.append(entry)
                 elif args.trace:
-                    print(f"Ignoring codecache log entry: {line}")
+                    print(f"Ignoring codecache log entry: {stripped}")
 
     return hotspot_events, truffle_events
 
@@ -530,5 +538,5 @@ if __name__=="__main__":
         if args.hotspots != None and args.hotspots > 0:
             hotspots(args.hotspots, call_targets)
 
-        if args.stats :
-            stats(call_targets)
+        if args.stats:
+            stats(args, call_targets)
