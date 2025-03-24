@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from LogEventType import LogEventType
 
@@ -12,7 +12,7 @@ class HotSpotLogEntry:
         self._raw: str   = raw
         self._eventType: LogEventType = logEventType
         self._comp_id: int = hotspotCompId
-        self._timestamp: datetime = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%f%z")
+        self._timestamp: datetime = datetime.fromisoformat(timestamp).astimezone(timezone.utc)
         self._tier = ""
 
     def __str__(self):

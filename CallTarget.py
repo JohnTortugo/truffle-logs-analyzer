@@ -1,11 +1,14 @@
+from typing import Optional
+
+
 class CallTarget:
-    def __init__(self, id, name, source):
-        self._id      = id
-        self._name    = name
+    def __init__(self, id: int, name: str, source: Optional[str]):
+        self._id: str = id
+        self._name: str = name
         if source != None and len(source.strip().split(' ')) == 3:
             self._source = source.strip().split(' ')[2]
         else:
-            self._source  = source
+            self._source = source
         self._starts  = []                # Collection of entries representing log entries of type compilation start 
         self._dones   = []                # Collection of entries representing log entries of type compilation done 
         self._deopts  = []                # Collection of entries representing log entries of type deoptizations 
