@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from LogEventType import LogEventType
+from .LogEventType import LogEventType
 
 
 class TruffleEngineOptLogEntry:

@@ -1,8 +1,8 @@
 import re
 from typing import Optional
 
-from HotSpotLogEntry import HotSpotLogEntry
-from LogEventType import LogEventType
+from .HotSpotLogEntry import HotSpotLogEntry
+from .LogEventType import LogEventType
 
 
 class ParseHotspotLogEntry:

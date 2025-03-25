@@ -1,0 +1,27 @@
+[build-system]
+requires = [ "setuptools>=61.0.0" ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "truffle-logs-analyzer"
+version = "0.0.1"
+description = "Utility to parse & analyze GraalVM Truffle engine logs"
+authors = [
+    {name="Cesar Soares", email="dsl@amazon.com"},
+    {name="Chris Ropposch", email="ropposch@amazon.com"},
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas==2.2.3"
+]
+
+[project.urls]
+Homepage = "https://github.com/JohnTortugo/truffle-logs-analyzer"
+Issues = "https://github.com/JohnTortugo/truffle-logs-analyzer/issues"
+
+[project.scripts]
+truffle-logs = "truffle_logs_analyzer.truffle_logs:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}

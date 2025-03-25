@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from LogEventType import LogEventType
+from .LogEventType import LogEventType
 
 
 class HotSpotLogEntry:

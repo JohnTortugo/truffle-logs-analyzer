@@ -1,18 +1,16 @@
-#!/usr/bin/python3
-
 import argparse
 import datetime
 from collections import defaultdict
 from datetime import timedelta
 from functools import cmp_to_key
 
-from CallTarget import CallTarget
-from HotSpotLogEntry import HotSpotLogEntry
-from LogEventType import LogEventType
-from ParseHotspotLogEntry import ParseHotspotLogEntry
-from ParseTruffleEngineOptLogEntry import ParseTruffleEngineOptLogEntry
-from ReplCommand import ReplCommand
-from TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
+from .CallTarget import CallTarget
+from .HotSpotLogEntry import HotSpotLogEntry
+from .LogEventType import LogEventType
+from .ParseHotspotLogEntry import ParseHotspotLogEntry
+from .ParseTruffleEngineOptLogEntry import ParseTruffleEngineOptLogEntry
+from .ReplCommand import ReplCommand
+from .TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
 def stats(args, call_targets: dict[int, CallTarget]) -> None:
@@ -31,10 +29,10 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
         for flr in ct._failures:
             if "Maximum compilation" in flr._reason:
                 ct_with_max_compilations.append(ct)
-                num_max_compilation_reached += 1 
+                num_max_compilation_reached += 1
 
     # Count how many flush call targets thrashed
-    num_max_cache_trashing_cts = 0
+    num_max_cache_thrashing_cts = 0
     for ct in ct_with_max_compilations:
         flushes = 0
 
@@ -53,7 +51,7 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
             continue
 
         if float(flushes)/len(ct._dones) >= 0.9:
-            num_max_cache_trashing_cts += 1
+            num_max_cache_thrashing_cts += 1
 
     print("Number of call targets.....................................: {value}".format(value = num_call_targets))
     print("Number of compilations.....................................: {value}".format(value = num_compilations))
@@ -61,7 +59,7 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
     print("Number of deoptimizations..................................: {value}".format(value = num_deoptimizations))
     print("Number of failures.........................................: {value}".format(value = num_failures))
     print("Number of call targets that reached maximum compilation....: {value} ({perc:>.2f}%)".format(value = num_max_compilation_reached, perc = (float(num_max_compilation_reached) / num_call_targets)*100))
-    print("Number of failures due to cache trashing...................: {value}".format(value = num_max_cache_trashing_cts))
+    print("Number of failures due to cache thrashing...................: {value}".format(value = num_max_cache_thrashing_cts))
     print("Amount of produced code (MB)...............................: {value}".format(value = amount_of_produced_code / 1024 / 1024))
     print("Amount of time compiling (Sec).............................: {value}".format(value = amount_of_time_compiling / 1000))
 
@@ -496,7 +494,7 @@ def repl(args, call_targets, hotspotEvents, truffleEvents):
             print("What?!")
 
 
-if __name__=="__main__":
+def main():
     parser = argparse.ArgumentParser(description='GraalVM Truffle Logs Utility')
     parser.add_argument('logfile', type=str, help='Path of file containing Truffle engine logs.')
     parser.add_argument('--interactive', action='store_true', help='Enter the REPL mode.')

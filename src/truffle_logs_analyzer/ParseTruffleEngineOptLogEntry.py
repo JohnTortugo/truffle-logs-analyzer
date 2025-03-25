@@ -2,8 +2,8 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from LogEventType import LogEventType
-from TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
+from .LogEventType import LogEventType
+from .TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 OPT_REGEX = re.compile(r'^\[engine] opt ([\w.]+)\s+engine=(\d+)\s+id=(\d+)(.*)')
 TIER_REGEX = re.compile(r'^Tier\s+(\d)')
