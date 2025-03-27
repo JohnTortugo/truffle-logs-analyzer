@@ -1,22 +1,19 @@
-#!/usr/bin/python3
-
-import pdb
-import os
 import argparse
 import datetime
-from datetime import timedelta
-from datetime import date
-from functools import cmp_to_key
 from collections import defaultdict
+from datetime import timedelta
+from functools import cmp_to_key
 
-from CallTarget import CallTarget
-from LogEventType import LogEventType
-from ReplCommand import ReplCommand
-from ParseHotspotLogEntry import ParseHotspotLogEntry
-from ParseTruffleEngineLogEntry import ParseTruffleEngineLogEntry
+from .CallTarget import CallTarget
+from .HotSpotLogEntry import HotSpotLogEntry
+from .LogEventType import LogEventType
+from .ParseHotspotLogEntry import ParseHotspotLogEntry
+from .ParseTruffleEngineOptLogEntry import ParseTruffleEngineOptLogEntry
+from .ReplCommand import ReplCommand
+from .TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
-def stats(call_targets):
+def stats(args, call_targets: dict[int, CallTarget]) -> None:
     num_call_targets = len(call_targets)
     num_compilations = sum(len(ct._dones) for ct in call_targets.values())
     num_invalidations = sum(len(ct._invals) for ct in call_targets.values())
@@ -32,22 +29,29 @@ def stats(call_targets):
         for flr in ct._failures:
             if "Maximum compilation" in flr._reason:
                 ct_with_max_compilations.append(ct)
-                num_max_compilation_reached += 1 
+                num_max_compilation_reached += 1
 
-    # Count how many call targets reached the maximum compilation threshold 
-    num_max_cache_trashing_cts = 0
+    # Count how many flush call targets thrashed
+    num_max_cache_thrashing_cts = 0
     for ct in ct_with_max_compilations:
-        prev = None
         flushes = 0
+
+        prev = None
         for evt in ct.all_events_sorted():
             if evt._eventType == LogEventType.CacheFlushing:
                 if prev != None and (prev._eventType == LogEventType.Done or prev._eventType == LogEventType.CacheFlushing):
                     flushes += 1
             prev = evt
+
+        # Due to rolling logs, it's possible we've found flushes which have no corresponding dones..avoid divide by
+        # zero in those cases
+        if len(ct._dones) == 0:
+            if args.verbose:
+                print(f"Skipping thrash calculation for target {ct._id} as no 'done' events were encountered")
+            continue
+
         if float(flushes)/len(ct._dones) >= 0.9:
-            num_max_cache_trashing_cts += 1 
-        else:
-            print(f"{ct._id} -> {float(flushes)/len(ct._dones)}")
+            num_max_cache_thrashing_cts += 1
 
     print("Number of call targets.....................................: {value}".format(value = num_call_targets))
     print("Number of compilations.....................................: {value}".format(value = num_compilations))
@@ -55,18 +59,18 @@ def stats(call_targets):
     print("Number of deoptimizations..................................: {value}".format(value = num_deoptimizations))
     print("Number of failures.........................................: {value}".format(value = num_failures))
     print("Number of call targets that reached maximum compilation....: {value} ({perc:>.2f}%)".format(value = num_max_compilation_reached, perc = (float(num_max_compilation_reached) / num_call_targets)*100))
-    print("Number of failures due to cache trashing...................: {value}".format(value = num_max_cache_trashing_cts))
+    print("Number of failures due to cache thrashing...................: {value}".format(value = num_max_cache_thrashing_cts))
     print("Amount of produced code (MB)...............................: {value}".format(value = amount_of_produced_code / 1024 / 1024))
     print("Amount of time compiling (Sec).............................: {value}".format(value = amount_of_time_compiling / 1000))
 
 
 
-def details_for_call_id(call_id, call_targets):
+def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> None:
     if call_id not in call_targets:
         print(f"Call target with ID {call_id} not present.")
         return 
 
-    target = call_targets[int(call_id)]
+    target = call_targets[call_id]
     num_compilations = len(target._dones)
     num_invalidations = len(target._invals)
     num_deoptimizations = len(target._deopts)
@@ -98,7 +102,7 @@ def details_for_call_id(call_id, call_targets):
     all_events = target.all_events_sorted()
     for evt in all_events:
         if evt._eventType == LogEventType.CacheFlushing:
-            flushes[int(evt._comp_id)] = evt
+            flushes[evt._comp_id] = evt
 
     prev_evt = None
     prev_enqueued = None
@@ -113,7 +117,7 @@ def details_for_call_id(call_id, call_targets):
 
         if evt._eventType == LogEventType.Done:
             if int(evt._comp_id) in flushes:
-                flush_evt = flushes[int(evt._comp_id)]
+                flush_evt = flushes[evt._comp_id]
                 duration = flush_evt._timestamp - evt._timestamp
                 print(f"| Evicted after {duration.total_seconds()}s")
             else:
@@ -141,7 +145,7 @@ def details_for_call_id(call_id, call_targets):
 
 
 
-def histogram(hsize, call_targets):
+def histogram(hsize: int, call_targets: dict[int, CallTarget]) -> None:
     def compare(entry1, entry2):
         if len(entry2._dones) != len(entry1._dones):
             return len(entry2._dones) - len(entry1._dones)
@@ -341,55 +345,48 @@ def hotspots(hsize, call_targets):
               f"{target._source:>50}")
 
 
-def parseLogFile(args):
-    hotspotEvents = []
-    truffleEvents = []
-    lines = []
-
-    fsize = os.path.getsize(args.logfile)
+def parse_log_file(args) -> tuple[list[HotSpotLogEntry], list[TruffleEngineOptLogEntry]]:
+    hotspot_events: list[HotSpotLogEntry] = []
+    truffle_events: list[TruffleEngineOptLogEntry] = []
 
     with open(args.logfile, 'r') as file:
         for line in file:
-            lines.append(line)
+            stripped = line.rstrip()
+            if stripped.startswith("[engine] opt"):
+                entry = ParseTruffleEngineOptLogEntry(stripped).entry()
+                if entry is not None:
+                    truffle_events.append(entry)
+                elif args.trace:
+                    print(f"Ignoring engine log entry: {stripped}")
+            elif stripped.find("*flushing ") >= 0:
+                entry = ParseHotspotLogEntry(stripped).entry()
+                if entry is not None:
+                    hotspot_events.append(entry)
+                elif args.trace:
+                    print(f"Ignoring codecache log entry: {stripped}")
 
-    for i in range(len(lines)):
-        line = lines[i]
-        if line.startswith("[engine] opt"): 
-            entry = ParseTruffleEngineLogEntry(line).entry()
-            if entry != None :
-                truffleEvents.append(entry)
-        elif line.find("*flushing ") >= 0:
-            entry = ParseHotspotLogEntry(line).entry()
-            if entry != None :
-                hotspotEvents.append(entry)
-            if (args.trace):
-                print(f"Ignoring codecache log entry: {line}")
-        #elif line.find("[engine] transferToInterpreter at") >= 0:
-        #    i += 1
-        #    line = lines[i]
-        #    entry = ParseTruffleEngineLogEntry(line).entry()
-        #    if entry != None :
-        #        truffleEvents.append(entry)
-
-    return hotspotEvents, truffleEvents
+    return hotspot_events, truffle_events
 
 
-def collectCallTargets(events):
-    call_targets = {}
+def collect_call_targets(events: list[TruffleEngineOptLogEntry]) -> dict[int, CallTarget]:
+    call_targets: dict[int, CallTarget] = {}
 
     for event in events:
         if event._id not in call_targets:
-            call_targets[int(event._id)] = CallTarget(event._id, event._name, event._source)
+            call_targets[event._id] = CallTarget(id=event._id, name=event._name, source=event._source)
 
     return call_targets
 
 
-def populateEventsToCallTargets(call_targets, hotspotEvents, truffleEvents):
-    speedup = {}
+def populate_events_to_call_targets(
+        call_targets: dict[int, CallTarget],
+        hotspot_events: list[HotSpotLogEntry],
+        truffle_events: list[TruffleEngineOptLogEntry]) -> None:
+    speedup: dict[str, CallTarget] = {}
     for ct in call_targets.values():
         speedup[ct._name] = ct
 
-    for truffleEvent in truffleEvents:
+    for truffleEvent in truffle_events:
         if truffleEvent._eventType == LogEventType.Start :
             call_targets[truffleEvent._id]._starts.append(truffleEvent)
 
@@ -412,18 +409,20 @@ def populateEventsToCallTargets(call_targets, hotspotEvents, truffleEvents):
             call_targets[truffleEvent._id]._failures.append(truffleEvent)
 
         elif truffleEvent._eventType == LogEventType.TransferToInterpreter:
+            # TODO - this seems buggy...CallTarget name has a transform (see ctor) whereas events are raw strings; they'll never match? or may not match?
             if truffleEvent._name in speedup:
                 target = speedup[truffleEvent._name]
                 call_targets[target._id]._ttis.append(truffleEvent)
             #else:
             #    print(f"Not found {truffleEvent._name}")
 
+    # TODO - why is this here?
     speedup = {}
     for ct in call_targets.values():
         for done in ct._dones:
             speedup[int(done._comp_id)] = int(ct._id)
 
-    for hotspotEvent in hotspotEvents:
+    for hotspotEvent in hotspot_events:
         if int(hotspotEvent._comp_id) in speedup:
             call_targets[speedup[hotspotEvent._comp_id]]._evictions.append(hotspotEvent)
         #else:
@@ -495,7 +494,7 @@ def repl(args, call_targets, hotspotEvents, truffleEvents):
             print("What?!")
 
 
-if __name__=="__main__":
+def main():
     parser = argparse.ArgumentParser(description='GraalVM Truffle Logs Utility')
     parser.add_argument('logfile', type=str, help='Path of file containing Truffle engine logs.')
     parser.add_argument('--interactive', action='store_true', help='Enter the REPL mode.')
@@ -509,18 +508,18 @@ if __name__=="__main__":
     parser.add_argument('--trace', action='store_true', help='Print detailed tracing messages.')
 
     args = parser.parse_args()
-    if (args.trace):
+    if args.trace:
         args.verbose = True
 
-    hotspotEvents, truffleEvents = parseLogFile(args)
+    hotspot_events, truffle_events = parse_log_file(args)
     print("Parsing done.")
-    call_targets = collectCallTargets(truffleEvents)
+    call_targets = collect_call_targets(truffle_events)
     print("Collecting call targets done.")
-    populateEventsToCallTargets(call_targets, hotspotEvents, truffleEvents)
+    populate_events_to_call_targets(call_targets, hotspot_events, truffle_events)
     print("Populating call targets done.")
 
     if args.interactive:
-        repl(args, call_targets, hotspotEvents, truffleEvents)
+        repl(args, call_targets, hotspot_events, truffle_events)
     else:
         if args.histogram != None and args.histogram > 0 :
             histogram(args.histogram, call_targets)
@@ -537,5 +536,5 @@ if __name__=="__main__":
         if args.hotspots != None and args.hotspots > 0:
             hotspots(args.hotspots, call_targets)
 
-        if args.stats :
-            stats(call_targets)
+        if args.stats:
+            stats(args, call_targets)
