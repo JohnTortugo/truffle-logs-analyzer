@@ -35,6 +35,10 @@ class ParseTruffleEngineLogEntry:
             logLine = logLine.replace("[engine] opt failed", "").strip()
             self._entry = self.parseFailedEntry(logLine);
 
+        elif logLine.startswith("[engine] opt flushed"):
+            logLine = logLine.replace("[engine] opt flushed", "").strip()
+            self._entry = self.parseFlushedEntry(logLine);
+
         else:
             logLine = logLine.strip()
             self._entry = self.parseTransferToInterpreterEntry(logLine);
@@ -238,6 +242,34 @@ class ParseTruffleEngineLogEntry:
                                         self.parseLabelAndValue(parts[4]),  # timestamp
                                         parts[5],                           # source
                                         parts[3])                           # reason
+
+    def parseFlushedEntry(self, logLine):
+        parts = logLine.split('|')
+
+        if len(parts) != 3 :
+            if False:
+                print(f"Can't parse this flushed entry line that has {len(parts)} parts: {logLine}")
+            return None
+
+        targetId, engineId, callTargetName = self.parseIdComponent(parts[0])
+
+        return TruffleEngineOptLogEntry(logLine,
+                                        LogEventType.Flushed,
+                                        engineId,
+                                        targetId,
+                                        callTargetName,
+                                          "", # tier
+                                        None, # execution_count
+                                           0, # compilation_time
+                                        None, # ast_size
+                                        None, # inlining info
+                                        None, # ir info
+                                           0, # code size info
+                                        None, # code addr info
+                                        None, # compilation id
+                                        self.parseLabelAndValue(parts[1]), # timestamp
+                                        parts[2],                          # source
+                                        None) #reason
 
     def parseTransferToInterpreterEntry(self, logLine):
         parts = logLine.split('(')

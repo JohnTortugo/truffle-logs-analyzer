@@ -2,8 +2,8 @@ class CallTarget:
     def __init__(self, id, name, source):
         self._id      = id
         self._name    = name
-        if source != None and len(source.strip().split(' ')) == 3:
-            self._source = source.strip().split(' ')[2]
+        if source != None and len(source.strip().split(' ')) >= 2:
+            self._source = source.strip().split(' ')[1]
         else:
             self._source  = source
         self._starts  = []                # Collection of entries representing log entries of type compilation start 

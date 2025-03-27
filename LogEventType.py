@@ -8,5 +8,6 @@ class LogEventType(Enum):
     Enqueued              = 5
     Dequeued              = 6
     Failed                = 7
-    TransferToInterpreter = 8
-    CacheFlushing         = 9
+    Flushed               = 8
+    TransferToInterpreter = 9
+    CacheFlushing         = 10
