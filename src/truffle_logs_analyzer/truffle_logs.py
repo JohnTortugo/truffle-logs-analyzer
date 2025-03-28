@@ -5,7 +5,6 @@ from datetime import timedelta
 from functools import cmp_to_key
 
 from .CallTarget import CallTarget
-from .HotSpotLogEntry import HotSpotLogEntry
 from .LogEventType import LogEventType
 from .ParseHotspotLogEntry import ParseHotspotLogEntry
 from .ParseTruffleEngineOptLogEntry import ParseTruffleEngineOptLogEntry
@@ -343,8 +342,8 @@ def hotspots(hsize: int, call_targets: dict[id, CallTarget]):
               f"{target.source:>50}")
 
 
-def parse_log_file(args) -> tuple[list[HotSpotLogEntry], list[TruffleEngineOptLogEntry]]:
-    hotspot_events: list[HotSpotLogEntry] = []
+def parse_log_file(args) -> tuple[list[TruffleEngineOptLogEntry], list[TruffleEngineOptLogEntry]]:
+    hotspot_events: list[TruffleEngineOptLogEntry] = []
     truffle_events: list[TruffleEngineOptLogEntry] = []
 
     with open(args.logfile, 'r') as file:
@@ -362,6 +361,8 @@ def parse_log_file(args) -> tuple[list[HotSpotLogEntry], list[TruffleEngineOptLo
                     hotspot_events.append(entry)
                 elif args.trace:
                     print(f"Ignoring codecache log entry: {stripped}")
+            elif args.trace:
+                print(f"Ignoring log entry: {stripped}")
 
     return hotspot_events, truffle_events
 
@@ -378,7 +379,7 @@ def collect_call_targets(events: list[TruffleEngineOptLogEntry]) -> dict[int, Ca
 
 def populate_events_to_call_targets(
         call_targets: dict[int, CallTarget],
-        hotspot_events: list[HotSpotLogEntry],
+        hotspot_events: list[TruffleEngineOptLogEntry],
         truffle_events: list[TruffleEngineOptLogEntry]) -> None:
 
     # TODO -> I don't think call target names are necessarily unique so this seems like different targets
@@ -474,7 +475,7 @@ def repl_prompt():
 
 def repl(args,
          call_targets: dict[int, CallTarget],
-         hotspot_events: list[HotSpotLogEntry],
+         hotspot_events: list[TruffleEngineOptLogEntry],
          truffle_events: list[TruffleEngineOptLogEntry]) -> None:
     while True:
         cmd, info = repl_prompt()

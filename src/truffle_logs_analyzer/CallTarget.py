@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-from truffle_logs_analyzer.HotSpotLogEntry import HotSpotLogEntry
 from truffle_logs_analyzer.TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
@@ -15,7 +14,7 @@ class CallTarget:
     invals: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
     ttis: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
     failures: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
-    evictions: list[HotSpotLogEntry] = field(default_factory=list[HotSpotLogEntry])
+    evictions: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
     enqueues: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
     dequeues: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
 
@@ -25,14 +24,14 @@ class CallTarget:
         else:
             return 0
 
-    def all_events_sorted(self) -> list:
+    def all_events_sorted(self) -> list[TruffleEngineOptLogEntry]:
         all_events = self.deopts
         all_events.extend(self.dones)
         all_events.extend(self.starts)
         all_events.extend(self.invals)
         all_events.extend(self.ttis)
         all_events.extend(self.failures)
-        all_events.extend(self.evictions) #TODO! make hotspot evictions
+        all_events.extend(self.evictions)
         all_events.extend(self.enqueues)
         all_events.extend(self.dequeues)
         return sorted(all_events, key=lambda e: e.timestamp)

@@ -9,9 +9,9 @@ from .LogEventType import LogEventType
 class TruffleEngineOptLogEntry:
     _raw: str
     log_event_type: LogEventType
-    engine_id: int
-    id: int
-    name: str
+    engine_id: Optional[int]
+    id: Optional[int]
+    name: Optional[str]
     tier: Optional[int]
     exec_count: Optional[int]
     threshold: Optional[int]
@@ -29,7 +29,7 @@ class TruffleEngineOptLogEntry:
     code_addr: Optional[str]
     comp_id: Optional[int]
     timestamp: datetime
-    source: str
+    source: Optional[str]
     reason: Optional[str]
 
     def __str__(self):
