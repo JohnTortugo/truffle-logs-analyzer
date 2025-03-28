@@ -411,24 +411,18 @@ def populate_events_to_call_targets(
             call_targets[truffle_event.id].failures.append(truffle_event)
 
         elif truffle_event.log_event_type == LogEventType.TransferToInterpreter:
-            # TODO - this seems buggy...CallTarget name has a transform (see ctor) whereas events are raw strings; they'll never match? or may not match?
             if truffle_event.name in speedup:
                 target = speedup[truffle_event.name]
                 call_targets[target.id].ttis.append(truffle_event)
-            #else:
-            #    print(f"Not found {truffleEvent._name}")
 
-    # TODO -> Similar to call target names above...can comp ids get re-used and possibly collide?
-    speedup: dict[int, int]= {}
+    truffle_id_to_hotspot_id: dict[int, int]= {}
     for ct in call_targets.values():
         for done in ct.dones:
-            speedup[done.comp_id] = ct.id
+            truffle_id_to_hotspot_id[done.comp_id] = ct.id
 
     for hotspot_event in hotspot_events:
-        if int(hotspot_event.comp_id) in speedup:
-            call_targets[speedup[hotspot_event.comp_id]].evictions.append(hotspot_event)
-        #else:
-        #    print(f"Didn't find {hotspotEvent._comp_id} in speedup.")
+        if hotspot_event.comp_id in truffle_id_to_hotspot_id:
+            call_targets[truffle_id_to_hotspot_id[hotspot_event.comp_id]].evictions.append(hotspot_event)
 
 
 def repl_prompt():
