@@ -57,6 +57,9 @@ class ParseTruffleEngineOptLogEntry:
         elif opt == 'failed':
             if not len(segments) == 6: raise ValueError(f"opt failed should have 6 segments, got {segments}")
             return self.failed(log_line, segments)
+        elif opt == 'flushed':
+            if not len(segments) == 3: raise ValueError(f"opt flushed should have 3 segments, got {segments}")
+            return self.flushed(log_line, segments)
         else:
             raise ValueError(f"Unknown option '{opt}'")
 
@@ -228,6 +231,37 @@ class ParseTruffleEngineOptLogEntry:
             source=segments[2],
             reason=segments[3],
         )
+
+
+    def flushed(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
+        identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
+        return TruffleEngineOptLogEntry(
+            raw=log_line,
+            log_event_type=LogEventType.Flushed,
+            engine_id=int(identifiers[1]),
+            id=int(identifiers[2]),
+            name=identifiers[3],
+            tier=None,
+            exec_count=None,
+            threshold=None,
+            priority=None,
+            rate=None,
+            queue_size=None,
+            queue_change=None,
+            queue_load=None,
+            queue_time=None,
+            comp_time=None,
+            ast_size=None,
+            inline=None,
+            ir=None,
+            code_size_in_bytes=None,
+            code_addr=None,
+            comp_id=None,
+            timestamp=self.parse_timestamp(segments[1]),
+            source=segments[2],
+            reason=None,
+        )
+
 
 
     def unque(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
