@@ -1,39 +1,38 @@
-from typing import Optional
+from dataclasses import dataclass, field
+
+from truffle_logs_analyzer.HotSpotLogEntry import HotSpotLogEntry
+from truffle_logs_analyzer.TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
+@dataclass
 class CallTarget:
-    def __init__(self, id: int, name: str, source: Optional[str]):
-        self._id: str = id
-        self._name: str = name
-        if source != None and len(source.strip().split(' ')) == 3:
-            self._source = source.strip().split(' ')[2]
-        else:
-            self._source = source
-        self._starts  = []                # Collection of entries representing log entries of type compilation start 
-        self._dones   = []                # Collection of entries representing log entries of type compilation done 
-        self._deopts  = []                # Collection of entries representing log entries of type deoptizations 
-        self._invals  = []                # Collection of entries representing log entries of type invalidations
-        self._ttis    = []                # Collection of entries representing log entries of type transferToInterpreter*
-        self._failures  = []              # Collection of entries representing log entries of type failure
-        self._evictions = []              # Collection of entries representing code cache evictions of this call target
-        self._enqueues = []
-        self._dequeues = []
+    id: int
+    name: str
+    source: str
+    starts: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    dones: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    deopts: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    invals: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    ttis: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    failures: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    evictions: list[HotSpotLogEntry] = field(default_factory=list[HotSpotLogEntry])
+    enqueues: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    dequeues: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
 
-    def exec_count(self):
-        if len(self._enqueues) > 0:
-            evts = sorted(self._enqueues, key=lambda e: e._timestamp, reverse=True)
-            return evts[0]._exec_count
+    def exec_count(self) -> int:
+        if len(self.enqueues) > 0:
+            return sorted(self.enqueues, key=lambda e: e.timestamp, reverse=True)[0].exec_count
         else:
             return 0
 
-    def all_events_sorted(self):
-        all_events = self._deopts
-        all_events.extend(self._dones)
-        all_events.extend(self._starts)
-        all_events.extend(self._invals)
-        all_events.extend(self._ttis)
-        all_events.extend(self._failures)
-        all_events.extend(self._evictions)
-        all_events.extend(self._enqueues)
-        all_events.extend(self._dequeues)
-        return sorted(all_events, key=lambda e: e._timestamp)
+    def all_events_sorted(self) -> list:
+        all_events = self.deopts
+        all_events.extend(self.dones)
+        all_events.extend(self.starts)
+        all_events.extend(self.invals)
+        all_events.extend(self.ttis)
+        all_events.extend(self.failures)
+        all_events.extend(self.evictions) #TODO! make hotspot evictions
+        all_events.extend(self.enqueues)
+        all_events.extend(self.dequeues)
+        return sorted(all_events, key=lambda e: e.timestamp)

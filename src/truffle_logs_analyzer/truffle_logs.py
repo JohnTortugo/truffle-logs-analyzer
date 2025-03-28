@@ -15,19 +15,19 @@ from .TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 def stats(args, call_targets: dict[int, CallTarget]) -> None:
     num_call_targets = len(call_targets)
-    num_compilations = sum(len(ct._dones) for ct in call_targets.values())
-    num_invalidations = sum(len(ct._invals) for ct in call_targets.values())
-    num_deoptimizations = sum(len(ct._deopts) for ct in call_targets.values())
-    num_failures = sum(len(ct._failures) for ct in call_targets.values())
-    amount_of_produced_code = sum(dn._code_size_in_bytes for ct in call_targets.values() for dn in ct._dones)
-    amount_of_time_compiling = sum(dn._comp_time for ct in call_targets.values() for dn in ct._dones)
+    num_compilations = sum(len(ct.dones) for ct in call_targets.values())
+    num_invalidations = sum(len(ct.invals) for ct in call_targets.values())
+    num_deoptimizations = sum(len(ct.deopts) for ct in call_targets.values())
+    num_failures = sum(len(ct.failures) for ct in call_targets.values())
+    amount_of_produced_code = sum(dn.code_size_in_bytes for ct in call_targets.values() for dn in ct.dones)
+    amount_of_time_compiling = sum(dn.comp_time for ct in call_targets.values() for dn in ct.dones)
 
     # Count how many call targets reached the maximum compilation threshold
     ct_with_max_compilations = []
     num_max_compilation_reached = 0
     for ct in call_targets.values():
-        for flr in ct._failures:
-            if "Maximum compilation" in flr._reason:
+        for flr in ct.failures:
+            if "Maximum compilation" in flr.reason:
                 ct_with_max_compilations.append(ct)
                 num_max_compilation_reached += 1
 
@@ -38,19 +38,19 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
 
         prev = None
         for evt in ct.all_events_sorted():
-            if evt._eventType == LogEventType.CacheFlushing:
-                if prev != None and (prev._eventType == LogEventType.Done or prev._eventType == LogEventType.CacheFlushing):
+            if evt.log_event_type == LogEventType.CacheFlushing:
+                if prev is not None and (prev.log_event_type == LogEventType.Done or prev.log_event_type == LogEventType.CacheFlushing):
                     flushes += 1
             prev = evt
 
-        # Due to rolling logs, it's possible we've found flushes which have no corresponding dones..avoid divide by
+        # Due to rolling logs, it's possible we've found flushes which have no corresponding dones...avoid divide by
         # zero in those cases
-        if len(ct._dones) == 0:
+        if len(ct.dones) == 0:
             if args.verbose:
-                print(f"Skipping thrash calculation for target {ct._id} as no 'done' events were encountered")
+                print(f"Skipping thrash calculation for target {ct.id} as no 'done' events were encountered")
             continue
 
-        if float(flushes)/len(ct._dones) >= 0.9:
+        if float(flushes)/len(ct.dones) >= 0.9:
             num_max_cache_thrashing_cts += 1
 
     print("Number of call targets.....................................: {value}".format(value = num_call_targets))
@@ -71,13 +71,13 @@ def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> No
         return 
 
     target = call_targets[call_id]
-    num_compilations = len(target._dones)
-    num_invalidations = len(target._invals)
-    num_deoptimizations = len(target._deopts)
-    num_failures = len(target._failures)
-    num_evictions = len(target._evictions)
-    amount_of_produced_code = sum(dn._code_size_in_bytes for dn in target._dones)
-    amount_of_time_compiling = sum(dn._comp_time for dn in target._dones)
+    num_compilations = len(target.dones)
+    num_invalidations = len(target.invals)
+    num_deoptimizations = len(target.deopts)
+    num_failures = len(target.failures)
+    num_evictions = len(target.evictions)
+    amount_of_produced_code = sum(dn.code_size_in_bytes for dn in target.dones)
+    amount_of_time_compiling = sum(dn.comp_time for dn in target.dones)
 
     print("Number of compilations..........: {value}".format(value = num_compilations))
     print("Number of invalidations.........: {value}".format(value = num_invalidations))
@@ -101,31 +101,31 @@ def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> No
     flushes = {}
     all_events = target.all_events_sorted()
     for evt in all_events:
-        if evt._eventType == LogEventType.CacheFlushing:
-            flushes[evt._comp_id] = evt
+        if evt.log_event_type == LogEventType.CacheFlushing:
+            flushes[evt.comp_id] = evt
 
     prev_evt = None
     prev_enqueued = None
     for evt in all_events:
         print("\t{type:<30} | {tier:>10} | {exec_count:>10} | {comp_id:>10} | {when}"
-              .format(type = evt._eventType, 
-                      tier = evt._tier, 
-                      exec_count = evt._exec_count if evt._eventType == LogEventType.Enqueued else "",
-                      comp_id = evt._comp_id if (evt._eventType == LogEventType.Done or evt._eventType == LogEventType.CacheFlushing) else "",
-                      when = evt._timestamp),
-                      end = "")
+              .format(type = evt.log_event_type,
+                      tier = evt.tier,
+                      exec_count = evt.exec_count if evt.log_event_type == LogEventType.Enqueued else "",
+                      comp_id = evt.comp_id if (evt.log_event_type == LogEventType.Done or evt.log_event_type == LogEventType.CacheFlushing) else "",
+                      when = evt.timestamp),
+              end = "")
 
-        if evt._eventType == LogEventType.Done:
-            if int(evt._comp_id) in flushes:
-                flush_evt = flushes[evt._comp_id]
-                duration = flush_evt._timestamp - evt._timestamp
+        if evt.log_event_type == LogEventType.Done:
+            if int(evt.comp_id) in flushes:
+                flush_evt = flushes[evt.comp_id]
+                duration = flush_evt.timestamp - evt.timestamp
                 print(f"| Evicted after {duration.total_seconds()}s")
             else:
                 print("| ")
-        elif evt._eventType == LogEventType.Enqueued:
-            if prev_enqueued != None:
-                exec_diff = evt._exec_count - prev_enqueued._exec_count
-                secs_diff = (evt._timestamp - prev_enqueued._timestamp).total_seconds()
+        elif evt.log_event_type == LogEventType.Enqueued:
+            if prev_enqueued is not None:
+                exec_diff = evt.exec_count - prev_enqueued.exec_count
+                secs_diff = (evt.timestamp - prev_enqueued.timestamp).total_seconds()
                 print("| Execution rate {exec_diff}/{secs_diff} = {rate:>.2f}/s".format(exec_diff = exec_diff, secs_diff = secs_diff, rate = float(exec_diff)/secs_diff))
             else:
                 print("| ")
@@ -133,7 +133,7 @@ def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> No
         else:
             print("| ")
         
-        if evt._eventType == LogEventType.CacheFlushing and prev_evt != LogEventType.CacheFlushing:
+        if evt.log_event_type == LogEventType.CacheFlushing and prev_evt != LogEventType.CacheFlushing:
             print("")
         
         # Keep reference to previous
@@ -146,16 +146,16 @@ def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> No
 
 
 def histogram(hsize: int, call_targets: dict[int, CallTarget]) -> None:
-    def compare(entry1, entry2):
-        if len(entry2._dones) != len(entry1._dones):
-            return len(entry2._dones) - len(entry1._dones)
+    def compare(entry1: CallTarget, entry2: CallTarget):
+        if len(entry2.dones) != len(entry1.dones):
+            return len(entry2.dones) - len(entry1.dones)
         else:
-            timec1 = sum(dn._comp_time for dn in entry1._dones)
-            timec2 = sum(dn._comp_time for dn in entry2._dones)
-            return timec2 - timec1
+            total_compile_time_1 = sum(dn.comp_time for dn in entry1.dones)
+            total_compile_time_2 = sum(dn.comp_time for dn in entry2.dones)
+            return total_compile_time_2 - total_compile_time_1
 
     values = list(call_targets.values())
-    sortedvalues = sorted(values, key=cmp_to_key(compare))
+    sorted_values = sorted(values, key=cmp_to_key(compare))
 
     print("{first:>10} | "
             "{comp_time:>15} | "
@@ -175,7 +175,7 @@ def histogram(hsize: int, call_targets: dict[int, CallTarget]) -> None:
                 invals = "Invals", 
                 deopts = "Deopts", 
                 evictions = "evictions", 
-                failures = "failures", 
+                failures = "failures",
                 ttis = "TransToInt", 
                 exec_count = "ExecCount", 
                 second = "ID", 
@@ -183,25 +183,25 @@ def histogram(hsize: int, call_targets: dict[int, CallTarget]) -> None:
                 fourth = "Source"))
     print("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
-    for target in sortedvalues[:hsize]:
-        amount_of_produced_code = sum(dn._code_size_in_bytes for dn in target._dones) / 1024
-        amount_of_time_compiling = sum(dn._comp_time for dn in target._dones)
+    for target in sorted_values[:hsize]:
+        amount_of_produced_code = sum(dn.code_size_in_bytes for dn in target.dones) / 1024
+        amount_of_time_compiling = sum(dn.comp_time for dn in target.dones)
 
-        print(f"{len(target._dones):>10} | "
+        print(f"{len(target.dones):>10} | "
               f"{amount_of_time_compiling:>15} | "
               f"{amount_of_produced_code:>16.0f} | "
-              f"{len(target._invals):>10} | "
-              f"{len(target._deopts):>10} | "
-              f"{len(target._evictions):>10} | "
-              f"{len(target._failures):>10} | "
-              f"{len(target._ttis):>10} | "
+              f"{len(target.invals):>10} | "
+              f"{len(target.deopts):>10} | "
+              f"{len(target.evictions):>10} | "
+              f"{len(target.failures):>10} | "
+              f"{len(target.ttis):>10} | "
               f"{target.exec_count():>10} | "
-              f"{target._id:>10} | "
-              f"{target._name:>50} | "
-              f"{target._source:>50}")
+              f"{target.id:>10} | "
+              f"{target.name:>50} | "
+              f"{target.source:>50}")
 
 
-def comp_rate(granularity, call_targets):
+def comp_rate(granularity: str, call_targets: dict[int, CallTarget]) -> None:
     compilations = defaultdict(int)
     produced_code = defaultdict(int)
     time_spent = defaultdict(int)
@@ -212,8 +212,6 @@ def comp_rate(granularity, call_targets):
     min_time = datetime.datetime.now(datetime.timezone.utc) + timedelta(days=3650)
     max_time = datetime.datetime.now(datetime.timezone.utc) - timedelta(days=3650)
 
-    minutes_increment = 0
-    time_key_pattern = ""
     if granularity == "hour":
         time_key_pattern = "%Y-%m-%d %H"
         minutes_increment = 60
@@ -225,21 +223,21 @@ def comp_rate(granularity, call_targets):
         return
 
     for ct in call_targets.values():
-        for dn in ct._dones:
-            if dn._timestamp < min_time:
-                min_time = dn._timestamp
-            if dn._timestamp > max_time:
-                max_time = dn._timestamp
+        for dn in ct.dones:
+            if dn.timestamp < min_time:
+                min_time = dn.timestamp
+            if dn.timestamp > max_time:
+                max_time = dn.timestamp
 
-            time_key = dn._timestamp.strftime(time_key_pattern)
+            time_key = dn.timestamp.strftime(time_key_pattern)
             compilations[time_key] += 1
-            produced_code[time_key] += dn._code_size_in_bytes
-            time_spent[time_key] += dn._comp_time
-            sources[time_key].add(ct._source)
-            targets[time_key].add(ct._id)
+            produced_code[time_key] += dn.code_size_in_bytes
+            time_spent[time_key] += dn.comp_time
+            sources[time_key].add(ct.source)
+            targets[time_key].add(ct.id)
 
-        for eviction in ct._evictions:
-            time_key = eviction._timestamp.strftime(time_key_pattern)
+        for eviction in ct.evictions:
+            time_key = eviction.timestamp.strftime(time_key_pattern)
             evictions[time_key] += 1
 
     print("{time_key:>20} | {compilations:>15} | {code:>15} | {time:>15} | {targets:>15} | {sources:>15} | {cumul_tgts:>15} | {sum_uniq_comps:>15} | {evictions:>15} |"
@@ -255,11 +253,11 @@ def comp_rate(granularity, call_targets):
             cumulative_targets.add(ct_id)
             ct = call_targets[ct_id]
             mx = 0
-            for dn in ct._dones:
-                dn_time = dn._timestamp.strftime(time_key_pattern)
+            for dn in ct.dones:
+                dn_time = dn.timestamp.strftime(time_key_pattern)
                 if dn_time == time_key:
-                    if mx < dn._code_size_in_bytes:
-                        mx = dn._code_size_in_bytes
+                    if mx < dn.code_size_in_bytes:
+                        mx = dn.code_size_in_bytes
             sum_largest_compilations += mx
 
         print(f"{time_key:>20} | "
@@ -276,10 +274,10 @@ def comp_rate(granularity, call_targets):
 
 
 
-def comp_paretto(call_targets):
+def comp_pareto(call_targets: dict[id, CallTarget]):
     counts = [0] * 101
     for ct in call_targets.values():
-        counts[len(ct._dones)] += 1
+        counts[len(ct.dones)] += 1
 
     print("{freq:>5} | {count:>7} | {curr_perc:>7} | {acc_perc:>7}".format(freq = "Freq", count = "Count", curr_perc = "Curr%", acc_perc = "Acc%"))
     print("---------------------------")
@@ -290,12 +288,12 @@ def comp_paretto(call_targets):
         print("{freq:>5} | {count:>5} | {curr_perc:>7.2f}% | {acc_perc:>7.2f}%".format(freq = freq, count = counts[freq], curr_perc = curr_perc*100, acc_perc = acc_perc*100))
 
 
-def hotspots(hsize, call_targets):
-    def compare(entry1, entry2):
+def hotspots(hsize: int, call_targets: dict[id, CallTarget]):
+    def compare(entry1: CallTarget, entry2: CallTarget):
         if entry2.exec_count() != entry1.exec_count():
             return entry2.exec_count() - entry1.exec_count()
         else:
-            return len(entry1._dones) - len(entry2._dones)
+            return len(entry1.dones) - len(entry2.dones)
 
     values = list(call_targets.values())
     targets = sorted(values, key=cmp_to_key(compare))
@@ -328,21 +326,21 @@ def hotspots(hsize, call_targets):
 
     for i in range(0, hsize):
         target = targets[i]
-        amount_of_produced_code = sum(dn._code_size_in_bytes for dn in target._dones) / 1024
-        amount_of_time_compiling = sum(dn._comp_time for dn in target._dones)
+        amount_of_produced_code = sum(dn.code_size_in_bytes for dn in target.dones) / 1024
+        amount_of_time_compiling = sum(dn.comp_time for dn in target.dones)
 
-        print(f"{len(target._dones):>10} | "
+        print(f"{len(target.dones):>10} | "
               f"{amount_of_time_compiling:>15} | "
               f"{amount_of_produced_code:>16.0f} | "
-              f"{len(target._invals):>10} | "
-              f"{len(target._deopts):>10} | "
-              f"{len(target._evictions):>10} | "
-              f"{len(target._failures):>10} | "
-              f"{len(target._ttis):>10} | "
+              f"{len(target.invals):>10} | "
+              f"{len(target.deopts):>10} | "
+              f"{len(target.evictions):>10} | "
+              f"{len(target.failures):>10} | "
+              f"{len(target.ttis):>10} | "
               f"{target.exec_count():>10} | "
-              f"{target._id:>10} | "
-              f"{target._name:>50} | "
-              f"{target._source:>50}")
+              f"{target.id:>10} | "
+              f"{target.name:>50} | "
+              f"{target.source:>50}")
 
 
 def parse_log_file(args) -> tuple[list[HotSpotLogEntry], list[TruffleEngineOptLogEntry]]:
@@ -372,8 +370,8 @@ def collect_call_targets(events: list[TruffleEngineOptLogEntry]) -> dict[int, Ca
     call_targets: dict[int, CallTarget] = {}
 
     for event in events:
-        if event._id not in call_targets:
-            call_targets[event._id] = CallTarget(id=event._id, name=event._name, source=event._source)
+        if event.id not in call_targets:
+            call_targets[event.id] = CallTarget(id=event.id, name=event.name, source=event.source)
 
     return call_targets
 
@@ -382,49 +380,52 @@ def populate_events_to_call_targets(
         call_targets: dict[int, CallTarget],
         hotspot_events: list[HotSpotLogEntry],
         truffle_events: list[TruffleEngineOptLogEntry]) -> None:
+
+    # TODO -> I don't think call target names are necessarily unique so this seems like different targets
+    #         may collide on the same name
     speedup: dict[str, CallTarget] = {}
     for ct in call_targets.values():
-        speedup[ct._name] = ct
+        speedup[ct.name] = ct
 
-    for truffleEvent in truffle_events:
-        if truffleEvent._eventType == LogEventType.Start :
-            call_targets[truffleEvent._id]._starts.append(truffleEvent)
+    for truffle_event in truffle_events:
+        if truffle_event.log_event_type == LogEventType.Start :
+            call_targets[truffle_event.id].starts.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.Enqueued :
-            call_targets[truffleEvent._id]._enqueues.append(truffleEvent)
+        elif truffle_event.log_event_type == LogEventType.Enqueued :
+            call_targets[truffle_event.id].enqueues.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.Dequeued:
-            call_targets[truffleEvent._id]._dequeues.append(truffleEvent)
+        elif truffle_event.log_event_type == LogEventType.Dequeued:
+            call_targets[truffle_event.id].dequeues.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.Done :
-            call_targets[truffleEvent._id]._dones.append(truffleEvent)
+        elif truffle_event.log_event_type == LogEventType.Done :
+            call_targets[truffle_event.id].dones.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.Deoptization :
-            call_targets[truffleEvent._id]._deopts.append(truffleEvent)
+        elif truffle_event.log_event_type == LogEventType.Deoptimization :
+            call_targets[truffle_event.id].deopts.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.Invalidation :
-            call_targets[truffleEvent._id]._invals.append(truffleEvent)
+        elif truffle_event.log_event_type == LogEventType.Invalidation :
+            call_targets[truffle_event.id].invals.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.Failed:
-            call_targets[truffleEvent._id]._failures.append(truffleEvent)
+        elif truffle_event.log_event_type == LogEventType.Failed:
+            call_targets[truffle_event.id].failures.append(truffle_event)
 
-        elif truffleEvent._eventType == LogEventType.TransferToInterpreter:
+        elif truffle_event.log_event_type == LogEventType.TransferToInterpreter:
             # TODO - this seems buggy...CallTarget name has a transform (see ctor) whereas events are raw strings; they'll never match? or may not match?
-            if truffleEvent._name in speedup:
-                target = speedup[truffleEvent._name]
-                call_targets[target._id]._ttis.append(truffleEvent)
+            if truffle_event.name in speedup:
+                target = speedup[truffle_event.name]
+                call_targets[target.id].ttis.append(truffle_event)
             #else:
             #    print(f"Not found {truffleEvent._name}")
 
-    # TODO - why is this here?
-    speedup = {}
+    # TODO -> Similar to call target names above...can comp ids get re-used and possibly collide?
+    speedup: dict[int, int]= {}
     for ct in call_targets.values():
-        for done in ct._dones:
-            speedup[int(done._comp_id)] = int(ct._id)
+        for done in ct.dones:
+            speedup[done.comp_id] = ct.id
 
-    for hotspotEvent in hotspot_events:
-        if int(hotspotEvent._comp_id) in speedup:
-            call_targets[speedup[hotspotEvent._comp_id]]._evictions.append(hotspotEvent)
+    for hotspot_event in hotspot_events:
+        if int(hotspot_event.comp_id) in speedup:
+            call_targets[speedup[hotspot_event.comp_id]].evictions.append(hotspot_event)
         #else:
         #    print(f"Didn't find {hotspotEvent._comp_id} in speedup.")
 
@@ -462,8 +463,8 @@ def repl_prompt():
                 return ReplCommand.CompRate, [parts[1]]
             else:
                 print("Missing granularity to list comp_rate.")
-        elif cmd == "comp_paretto":
-            return ReplCommand.CompParetto, None
+        elif cmd == "comp_pareto":
+            return ReplCommand.CompPareto, None
         elif cmd == "filename":
             return ReplCommand.FileName, None
         else:
@@ -471,13 +472,16 @@ def repl_prompt():
 
 
 
-def repl(args, call_targets, hotspotEvents, truffleEvents):
+def repl(args,
+         call_targets: dict[int, CallTarget],
+         hotspot_events: list[HotSpotLogEntry],
+         truffle_events: list[TruffleEngineOptLogEntry]) -> None:
     while True:
         cmd, info = repl_prompt()
         if cmd == ReplCommand.Quit:
             return
         elif cmd == ReplCommand.Stats:
-            stats(call_targets)
+            stats(args, call_targets)
         elif cmd == ReplCommand.Histogram:
             histogram(info[0], call_targets)
         elif cmd == ReplCommand.CallId:
@@ -488,8 +492,8 @@ def repl(args, call_targets, hotspotEvents, truffleEvents):
             comp_rate(info[0], call_targets)
         elif cmd == ReplCommand.FileName:
             print(args.logfile)
-        elif cmd == ReplCommand.CompParetto:
-            comp_paretto(call_targets)
+        elif cmd == ReplCommand.CompPareto:
+            comp_pareto(call_targets)
         else:
             print("What?!")
 
@@ -502,7 +506,7 @@ def main():
     parser.add_argument('--stats', action='store_true', help='Print general information about compilations.')
     parser.add_argument('--call_id', type=int, help='Print all events related to the call target with the ID specified.')
     parser.add_argument('--comp_rate', type=str, help='Print several statistics on a <hour/minute> granularity.')
-    parser.add_argument('--comp_paretto', action='store_true', help='Print paretto chart of number of call targets by number of compilations.')
+    parser.add_argument('--comp_pareto', action='store_true', help='Print pareto chart of number of call targets by number of compilations.')
     parser.add_argument('--hotspots', type=int, help='Print top N methods most executed.')
     parser.add_argument('--verbose', action='store_true', help='Print tracing messages.')
     parser.add_argument('--trace', action='store_true', help='Print detailed tracing messages.')
@@ -521,20 +525,23 @@ def main():
     if args.interactive:
         repl(args, call_targets, hotspot_events, truffle_events)
     else:
-        if args.histogram != None and args.histogram > 0 :
+        if args.histogram is not None and args.histogram > 0 :
             histogram(args.histogram, call_targets)
 
-        if args.call_id != None and args.call_id > 0 :
+        if args.call_id is not None and args.call_id > 0 :
             details_for_call_id(args.call_id, call_targets)
 
-        if args.comp_rate != None and args.comp_rate != "" :
+        if args.comp_rate is not None and args.comp_rate != "" :
             comp_rate(args.comp_rate, call_targets)
 
-        if args.comp_paretto:
-            comp_paretto(call_targets)
+        if args.comp_pareto:
+            comp_pareto(call_targets)
 
-        if args.hotspots != None and args.hotspots > 0:
+        if args.hotspots is not None and args.hotspots > 0:
             hotspots(args.hotspots, call_targets)
 
         if args.stats:
             stats(args, call_targets)
+
+if __name__=="__main__":
+    main()

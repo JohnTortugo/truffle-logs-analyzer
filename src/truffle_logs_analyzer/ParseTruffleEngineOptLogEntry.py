@@ -82,7 +82,7 @@ class ParseTruffleEngineOptLogEntry:
         queue_stats = self.match(segments[3], QUEUE_STATS_REGEX, 4, 'QueueStats')
 
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Enqueued,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
@@ -114,7 +114,7 @@ class ParseTruffleEngineOptLogEntry:
         queue_stats = self.match(segments[4], QUEUE_STATS_REGEX, 4, 'QueueStats')
 
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Start,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
@@ -147,7 +147,7 @@ class ParseTruffleEngineOptLogEntry:
         irs = self.match(segments[5], IR_REGEX, 1, 'IR')
 
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Done,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
@@ -176,8 +176,8 @@ class ParseTruffleEngineOptLogEntry:
     def deopt(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
         identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
         return TruffleEngineOptLogEntry(
-            raw=log_line,
-            log_event_type=LogEventType.Deoptization,
+            _raw=log_line,
+            log_event_type=LogEventType.Deoptimization,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
             name=identifiers[3],
@@ -206,7 +206,7 @@ class ParseTruffleEngineOptLogEntry:
     def inval(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
         identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Invalidation,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
@@ -236,7 +236,7 @@ class ParseTruffleEngineOptLogEntry:
     def flushed(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
         identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Flushed,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
@@ -270,7 +270,7 @@ class ParseTruffleEngineOptLogEntry:
         queue_stats = self.match(segments[3], QUEUE_STATS_REGEX, 4, 'QueueStats')
 
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Dequeued,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),
@@ -299,7 +299,7 @@ class ParseTruffleEngineOptLogEntry:
     def failed(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
         identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
         return TruffleEngineOptLogEntry(
-            raw=log_line,
+            _raw=log_line,
             log_event_type=LogEventType.Failed,
             engine_id=int(identifiers[1]),
             id=int(identifiers[2]),

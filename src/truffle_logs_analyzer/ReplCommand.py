@@ -4,7 +4,7 @@ class ReplCommand(Enum):
     Histogram   = 1
     Stats       = 2
     CompRate    = 3
-    CompParetto = 4
+    CompPareto  = 4
     CallId      = 5
     Hotspots    = 6
     FileName    = 7

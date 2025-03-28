@@ -1,18 +1,15 @@
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 
 from .LogEventType import LogEventType
 
 
+@dataclass
 class HotSpotLogEntry:
-    def __init__(self,
-                 raw: str,
-                 logEventType: LogEventType,
-                 hotspotCompId: int,
-                 timestamp: str):
-        self._raw: str   = raw
-        self._eventType: LogEventType = logEventType
-        self._comp_id: int = hotspotCompId
-        self._timestamp: datetime = datetime.fromisoformat(timestamp).astimezone(timezone.utc)
+    _raw: str
+    log_event_type: LogEventType
+    comp_id: int
+    timestamp: datetime
 
     def __str__(self):
-        return f"{self._eventType} | {self._raw}"
+        return f"{self.log_event_type} | {self._raw}"
