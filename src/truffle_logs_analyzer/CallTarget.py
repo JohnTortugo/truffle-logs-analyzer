@@ -18,6 +18,9 @@ class CallTarget:
     evictions: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
     enqueues: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
     dequeues: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    flushed: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    disabled: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
+    enabled: list[TruffleEngineOptLogEntry] = field(default_factory=list[TruffleEngineOptLogEntry])
 
     def exec_count(self) -> int:
         if len(self.enqueues) > 0:
@@ -35,6 +38,9 @@ class CallTarget:
         all_events.extend(self.evictions)
         all_events.extend(self.enqueues)
         all_events.extend(self.dequeues)
+        all_events.extend(self.flushed)
+        all_events.extend(self.disabled)
+        all_events.extend(self.enabled)
 
         # Sometimes Truffle emits events with the exact same timestamp (perhaps it's not granular enough?)
         # In that case, we'll assume queued, start, and done events follow in that order

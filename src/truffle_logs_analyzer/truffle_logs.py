@@ -410,6 +410,15 @@ def populate_events_to_call_targets(
         elif truffle_event.log_event_type == LogEventType.Failed:
             call_targets[truffle_event.id].failures.append(truffle_event)
 
+        elif truffle_event.log_event_type == LogEventType.Flushed:
+            call_targets[truffle_event.id].flushed.append(truffle_event)
+
+        elif truffle_event.log_event_type == LogEventType.Disabled:
+            call_targets[truffle_event.id].disabled.append(truffle_event)
+
+        elif truffle_event.log_event_type == LogEventType.Enabled:
+            call_targets[truffle_event.id].enabled.append(truffle_event)
+
         elif truffle_event.log_event_type == LogEventType.TransferToInterpreter:
             if truffle_event.name in speedup:
                 target = speedup[truffle_event.name]
