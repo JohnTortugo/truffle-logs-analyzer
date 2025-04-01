@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from truffle_logs_analyzer.LogEventType import LogEventType
 from truffle_logs_analyzer.TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
@@ -34,4 +35,12 @@ class CallTarget:
         all_events.extend(self.evictions)
         all_events.extend(self.enqueues)
         all_events.extend(self.dequeues)
-        return sorted(all_events, key=lambda e: e.timestamp)
+
+        # Sometimes Truffle emits events with the exact same timestamp (perhaps it's not granular enough?)
+        # In that case, we'll assume queued, start, and done events follow in that order
+        type_priority = { LogEventType.Enqueued: 1, LogEventType.Start: 2, LogEventType.Done: 3, }
+        def sort_by_timestamp_and_type(event: TruffleEngineOptLogEntry):
+            # Use the priority mapping for the secondary sort
+            return event.timestamp, type_priority.get(event.log_event_type, 999)
+
+        return sorted(all_events, key=sort_by_timestamp_and_type)

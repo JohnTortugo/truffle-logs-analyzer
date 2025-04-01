@@ -79,8 +79,9 @@ class ParseTruffleEngineOptLogEntry:
         raise ValueError(f"Failed to match {identifier} in '{s}'")
 
     def parse_timestamp(self, s: str) -> datetime:
-        return datetime.fromisoformat(
-            self.match(s, TIMESTAMP_REGEX, 1, 'Timestamp')[0]).astimezone(timezone.utc)
+        # truffle engine logs don't include the timezone offset, so this adds it
+        timestamp_z = self.match(s, TIMESTAMP_REGEX, 1, 'Timestamp')[0] + "+00:00"
+        return datetime.fromisoformat(timestamp_z).astimezone(timezone.utc)
 
     def queued(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
         identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")

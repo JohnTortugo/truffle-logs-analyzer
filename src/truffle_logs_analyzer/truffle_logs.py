@@ -108,7 +108,7 @@ def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> No
     for evt in all_events:
         print("\t{type:<30} | {tier:>10} | {exec_count:>10} | {comp_id:>10} | {when}"
               .format(type = evt.log_event_type,
-                      tier = evt.tier,
+                      tier = evt.tier if evt.tier is not None else "",
                       exec_count = evt.exec_count if evt.log_event_type == LogEventType.Enqueued else "",
                       comp_id = evt.comp_id if (evt.log_event_type == LogEventType.Done or evt.log_event_type == LogEventType.CacheFlushing) else "",
                       when = evt.timestamp),
