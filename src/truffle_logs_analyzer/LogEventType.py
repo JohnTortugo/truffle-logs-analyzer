@@ -11,3 +11,5 @@ class LogEventType(Enum):
     Flushed               = 8
     TransferToInterpreter = 9
     CacheFlushing         = 10
+    Disabled              = 11
+    Enabled               = 12

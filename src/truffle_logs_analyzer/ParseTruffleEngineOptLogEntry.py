@@ -60,6 +60,12 @@ class ParseTruffleEngineOptLogEntry:
         elif opt == 'flushed':
             if not len(segments) == 3: raise ValueError(f"opt flushed should have 3 segments, got {segments}")
             return self.flushed(log_line, segments)
+        elif opt == 'disabled':
+            if not len(segments) == 3: raise ValueError(f"opt disabled should have 3 segments, got {segments}")
+            return self.disabled(log_line, segments)
+        elif opt == 'enabled':
+            if not len(segments) == 3: raise ValueError(f"opt enabled should have 3 segments, got {segments}")
+            return self.enabled(log_line, segments)
         else:
             raise ValueError(f"Unknown option '{opt}'")
 
@@ -262,6 +268,65 @@ class ParseTruffleEngineOptLogEntry:
             reason=None,
         )
 
+
+    def disabled(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
+        identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
+        return TruffleEngineOptLogEntry(
+            _raw=log_line,
+            log_event_type=LogEventType.Disabled,
+            engine_id=int(identifiers[1]),
+            id=int(identifiers[2]),
+            name=identifiers[3],
+            tier=None,
+            exec_count=None,
+            threshold=None,
+            priority=None,
+            rate=None,
+            queue_size=None,
+            queue_change=None,
+            queue_load=None,
+            queue_time=None,
+            comp_time=None,
+            ast_size=None,
+            inline=None,
+            ir=None,
+            code_size_in_bytes=None,
+            code_addr=None,
+            comp_id=None,
+            timestamp=self.parse_timestamp(segments[1]),
+            source=segments[2],
+            reason=None,
+        )
+
+
+    def enabled(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
+        identifiers = self.match(segments[0], OPT_REGEX, 4, "Operation")
+        return TruffleEngineOptLogEntry(
+            _raw=log_line,
+            log_event_type=LogEventType.Enabled,
+            engine_id=int(identifiers[1]),
+            id=int(identifiers[2]),
+            name=identifiers[3],
+            tier=None,
+            exec_count=None,
+            threshold=None,
+            priority=None,
+            rate=None,
+            queue_size=None,
+            queue_change=None,
+            queue_load=None,
+            queue_time=None,
+            comp_time=None,
+            ast_size=None,
+            inline=None,
+            ir=None,
+            code_size_in_bytes=None,
+            code_addr=None,
+            comp_id=None,
+            timestamp=self.parse_timestamp(segments[1]),
+            source=segments[2],
+            reason=None,
+        )
 
 
     def unque(self, log_line: str, segments: list[str]) -> TruffleEngineOptLogEntry:
