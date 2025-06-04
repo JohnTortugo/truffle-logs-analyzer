@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import numpy as np
 from collections import defaultdict
 from datetime import timedelta
 from functools import cmp_to_key
@@ -20,6 +21,11 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
     num_failures = sum(len(ct.failures) for ct in call_targets.values())
     amount_of_produced_code = sum(dn.code_size_in_bytes for ct in call_targets.values() for dn in ct.dones)
     amount_of_time_compiling = sum(dn.comp_time for ct in call_targets.values() for dn in ct.dones)
+
+    # Calculate the largest seen code size for each call target
+    largest_code_sizes = []
+    for ct in call_targets.values():
+        largest_code_sizes.append(max(dn.code_size_in_bytes for dn in ct.dones) if len(ct.dones ) > 0 else 0)
 
     # Count how many call targets reached the maximum compilation threshold
     ct_with_max_compilations = []
@@ -58,10 +64,18 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
     print("Number of deoptimizations..................................: {value}".format(value = num_deoptimizations))
     print("Number of failures.........................................: {value}".format(value = num_failures))
     print("Number of call targets that reached maximum compilation....: {value} ({perc:>.2f}%)".format(value = num_max_compilation_reached, perc = (float(num_max_compilation_reached) / num_call_targets)*100))
-    print("Number of failures due to cache thrashing...................: {value}".format(value = num_max_cache_thrashing_cts))
-    print("Amount of produced code (MB)...............................: {value}".format(value = amount_of_produced_code / 1024 / 1024))
-    print("Amount of time compiling (Sec).............................: {value}".format(value = amount_of_time_compiling / 1000))
-
+    print("Number of failures due to cache thrashing..................: {value}".format(value = num_max_cache_thrashing_cts))
+    print("Amount of produced code (MB)...............................: {value:>.2f}".format(value = amount_of_produced_code / 1024 / 1024))
+    print("Amount of time compiling (Sec).............................: {value:>.2f}".format(value = amount_of_time_compiling / 1000))
+    print("Est. Max Code Cache Size (MB)..............................: {value:>.2f}".format(value = sum(largest_code_sizes) / 1024 / 1024))
+    print("  |-avg Cache Entry (KB)...................................: {value:>.2f}".format(value = np.average(largest_code_sizes) / 1024))
+    print("  |-p0 Cache Entry (KB)....................................: {value:>.2f}".format(value = np.min(largest_code_sizes) / 1024))
+    print("  |-p50 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 50) / 1024))
+    print("  |-p90 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 90) / 1024))
+    print("  |-p95 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 95) / 1024))
+    print("  |-p99 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 99) / 1024))
+    print("  |-p99.9 Cache Entry (KB).................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 99.9) / 1024))
+    print("  |-p100 Cache Entry (KB)..................................: {value:>.2f}".format(value = np.max(largest_code_sizes) / 1024))
 
 
 def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> None:
