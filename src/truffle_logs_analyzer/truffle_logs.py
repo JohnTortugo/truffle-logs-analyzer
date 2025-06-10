@@ -13,6 +13,11 @@ from .ReplCommand import ReplCommand
 from .TruffleEngineOptLogEntry import TruffleEngineOptLogEntry
 
 
+def percentile_and_size(array, perc, unit):
+    value = np.percentile(array, perc)
+    size = np.sum(np.array(array) <= value)
+    return value/unit, size
+
 def stats(args, call_targets: dict[int, CallTarget]) -> None:
     num_call_targets = len(call_targets)
     num_compilations = sum(len(ct.dones) for ct in call_targets.values())
@@ -23,9 +28,19 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
     amount_of_time_compiling = sum(dn.comp_time for ct in call_targets.values() for dn in ct.dones)
 
     # Calculate the largest seen code size for each call target
-    largest_code_sizes = []
+    tier1_code_sizes = []
+    tier2_code_sizes = []
+    comp_times_tier1 = []
+    comp_times_tier2 = []
     for ct in call_targets.values():
-        largest_code_sizes.append(max(dn.code_size_in_bytes for dn in ct.dones) if len(ct.dones ) > 0 else 0)
+        tier1_dones = [dn for dn in ct.dones if dn.tier == 1]
+        tier2_dones = [dn for dn in ct.dones if dn.tier == 2]
+
+        comp_times_tier1.extend([dn.comp_time for dn in tier1_dones])
+        comp_times_tier2.extend([dn.comp_time for dn in tier2_dones])
+
+        tier1_code_sizes.extend([dn.code_size_in_bytes for dn in tier1_dones])
+        tier2_code_sizes.extend([dn.code_size_in_bytes for dn in tier2_dones])
 
     # Count how many call targets reached the maximum compilation threshold
     ct_with_max_compilations = []
@@ -58,24 +73,51 @@ def stats(args, call_targets: dict[int, CallTarget]) -> None:
         if float(flushes)/len(ct.dones) >= 0.9:
             num_max_cache_thrashing_cts += 1
 
-    print("Number of call targets.....................................: {value}".format(value = num_call_targets))
-    print("Number of compilations.....................................: {value}".format(value = num_compilations))
-    print("Number of invalidations....................................: {value}".format(value = num_invalidations))
-    print("Number of deoptimizations..................................: {value}".format(value = num_deoptimizations))
-    print("Number of failures.........................................: {value}".format(value = num_failures))
-    print("Number of call targets that reached maximum compilation....: {value} ({perc:>.2f}%)".format(value = num_max_compilation_reached, perc = (float(num_max_compilation_reached) / num_call_targets)*100))
-    print("Number of failures due to cache thrashing..................: {value}".format(value = num_max_cache_thrashing_cts))
-    print("Amount of produced code (MB)...............................: {value:>.2f}".format(value = amount_of_produced_code / 1024 / 1024))
-    print("Amount of time compiling (Sec).............................: {value:>.2f}".format(value = amount_of_time_compiling / 1000))
-    print("Est. Max Code Cache Size (MB)..............................: {value:>.2f}".format(value = sum(largest_code_sizes) / 1024 / 1024))
-    print("  |-avg Cache Entry (KB)...................................: {value:>.2f}".format(value = np.average(largest_code_sizes) / 1024))
-    print("  |-p0 Cache Entry (KB)....................................: {value:>.2f}".format(value = np.min(largest_code_sizes) / 1024))
-    print("  |-p50 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 50) / 1024))
-    print("  |-p90 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 90) / 1024))
-    print("  |-p95 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 95) / 1024))
-    print("  |-p99 Cache Entry (KB)...................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 99) / 1024))
-    print("  |-p99.9 Cache Entry (KB).................................: {value:>.2f}".format(value = np.percentile(largest_code_sizes, 99.9) / 1024))
-    print("  |-p100 Cache Entry (KB)..................................: {value:>.2f}".format(value = np.max(largest_code_sizes) / 1024))
+    print("Number of call targets....................................: {value}".format(value = num_call_targets))
+    print("Number of compilations....................................: {value}".format(value = num_compilations))
+    print("Number of invalidations...................................: {value}".format(value = num_invalidations))
+    print("Number of deoptimizations.................................: {value}".format(value = num_deoptimizations))
+    print("Number of failures........................................: {value}".format(value = num_failures))
+    print("Number of call targets that reached maximum compilation...: {value} ({perc:>.2f}%)".format(value = num_max_compilation_reached, perc = (float(num_max_compilation_reached) / num_call_targets)*100))
+    print("Number of failures due to cache thrashing.................: {value}".format(value = num_max_cache_thrashing_cts))
+    print("Amount of time compiling (Sec)............................: {value:>.2f}".format(value = amount_of_time_compiling / 1000))
+    print("  Tier 1 (Sec)............................................: {value:>.2f}".format(value = np.sum(comp_times_tier1) / 1000))
+    print("    |-avg Comp Entry (ms).................................: {value:>.2f}".format(value = np.average(comp_times_tier1)))
+    print("    |-p0 Comp Entry (ms)..................................: {value:>.2f}".format(value = np.min(comp_times_tier1)))
+    print("    |-p50 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier1, 50, 1)))
+    print("    |-p90 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier1, 90, 1)))
+    print("    |-p95 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier1, 95, 1)))
+    print("    |-p99 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier1, 99, 1)))
+    print("    |-p99.9 Comp Entry (ms)...............................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier1, 99.9, 1)))
+    print("    |-p100 Comp Entry (ms)................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier1, 100, 1)))
+    print("  Tier 2 (Sec)............................................: {value:>.2f}".format(value = sum(comp_times_tier2)))
+    print("    |-avg Comp Entry (ms).................................: {value:>.2f}".format(value = np.average(comp_times_tier2)))
+    print("    |-p0 Comp Entry (ms)..................................: {value:>.2f}".format(value = np.min(comp_times_tier2)))
+    print("    |-p50 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier2, 50, 1)))
+    print("    |-p90 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier2, 90, 1)))
+    print("    |-p95 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier2, 95, 1)))
+    print("    |-p99 Comp Entry (ms).................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier2, 99, 1)))
+    print("    |-p99.9 Comp Entry (ms)...............................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier2, 99.9, 1)))
+    print("    |-p100 Comp Entry (ms)................................: {:>.2f} {}".format(*percentile_and_size(comp_times_tier2, 100, 1)))
+    print("Amount of produced code (MB)..............................: {value:>.2f}".format(value = amount_of_produced_code / 1024 / 1024))
+    print("  Tier 1 (MB).............................................: {value:>.2f}".format(value = sum(tier1_code_sizes) / 1024 / 1024))
+    print("    |-avg Cache Entry (KB)................................: {value:>.2f}".format(value = np.average(tier1_code_sizes) / 1024))
+    print("    |-p0 Cache Entry (KB).................................: {value:>.2f}".format(value = np.min(tier1_code_sizes) / 1024))
+    print("    |-p50 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier1_code_sizes, 50, 1024)))
+    print("    |-p90 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier1_code_sizes, 90, 1024)))
+    print("    |-p95 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier1_code_sizes, 95, 1024)))
+    print("    |-p99 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier1_code_sizes, 99, 1024)))
+    print("    |-p99.9 Cache Entry (KB)..............................: {:>.2f} {}".format(*percentile_and_size(tier1_code_sizes, 99.9, 1024)))
+    print("    |-p100 Cache Entry (KB)...............................: {:>.2f} {}".format(*percentile_and_size(tier1_code_sizes, 100, 1024)))
+    print("  Tier 2 (MB).............................................: {value:>.2f}".format(value = sum(tier2_code_sizes) / 1024 / 1024))
+    print("    |-avg Cache Entry (KB)................................: {value:>.2f}".format(value = np.average(tier2_code_sizes) / 1024))
+    print("    |-p0 Cache Entry (KB).................................: {value:>.2f}".format(value = np.min(tier2_code_sizes) / 1024))
+    print("    |-p50 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier2_code_sizes, 50, 1024)))
+    print("    |-p90 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier2_code_sizes, 90, 1024)))
+    print("    |-p95 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier2_code_sizes, 95, 1024)))
+    print("    |-p99 Cache Entry (KB)................................: {:>.2f} {}".format(*percentile_and_size(tier2_code_sizes, 99, 1024)))
+    print("    |-p99.9 Cache Entry (KB)..............................: {:>.2f} {}".format(*percentile_and_size(tier2_code_sizes, 99.9, 1024)))
+    print("    |-p100 Cache Entry (KB)...............................: {:>.2f} {}".format(*percentile_and_size(tier2_code_sizes, 100, 1024)))
 
 
 def details_for_call_id(call_id: int, call_targets: dict[int, CallTarget]) -> None:
